@@ -9,13 +9,15 @@ module.exports = {
     '已完成': 'ok',
     '重点保护': 'warn',
     '待执行': 'warn',
+    '待处理': 'warn',
     '异常待复查': 'bad',
     '暂停开放': 'bad'
   },
   collections: {
     sites: { label: '样点档案' },
     surveys: { label: '巡测记录' },
-    plans: { label: '巡测计划' }
+    plans: { label: '巡测计划' },
+    reviews: { label: '复查任务' }
   },
   stats: [
     { label: '样点', collection: 'sites' },
@@ -23,7 +25,9 @@ module.exports = {
     { label: '巡测记录', collection: 'surveys' },
     { label: '待复查', collection: 'surveys', filter: { field: 'status', value: '异常待复查' } },
     { label: '巡测计划', collection: 'plans' },
-    { label: '待执行', collection: 'plans', filter: { field: 'status', value: '待执行' } }
+    { label: '待执行', collection: 'plans', filter: { field: 'status', value: '待执行' } },
+    { label: '复查任务', collection: 'reviews' },
+    { label: '待处理复查', collection: 'reviews', filter: { field: 'status', value: '待处理' } }
   ],
   views: [
     {
@@ -125,6 +129,33 @@ module.exports = {
         { label: '样点', name: 'siteIds', type: 'multirelation', collection: 'sites', labelFields: ['cave', 'zone', 'pointCode'], required: true, wide: true },
         { label: '备注', name: 'note', type: 'textarea', wide: true }
       ]
+    },
+    {
+      id: 'reviews',
+      label: '复查任务',
+      collection: 'reviews',
+      formTitle: '新建复查任务',
+      listTitle: '复查任务列表',
+      submitLabel: '保存任务',
+      searchPlaceholder: '搜索负责人、处理建议',
+      searchFields: ['assignee', 'suggestion'],
+      statusField: 'status',
+      statusOptions: ['待处理', '已完成'],
+      titleFields: ['assignee', 'dueDate'],
+      relation: { collection: 'surveys', localKey: 'surveyId', labelFields: ['surveyor', 'date'], withSite: true },
+      summaryFields: ['suggestion'],
+      detailFields: [
+        { label: '截止日期', name: 'dueDate' },
+        { label: '复查负责人', name: 'assignee' }
+      ],
+      defaults: { status: '待处理', suggestion: '' },
+      fields: [
+        { label: '异常巡测记录', name: 'surveyId', type: 'relation', collection: 'surveys', labelFields: ['surveyor', 'date'], filter: { field: 'status', value: '异常待复查' }, withSite: true, required: true, wide: true },
+        { label: '复查负责人', name: 'assignee', required: true },
+        { label: '截止日期', name: 'dueDate', type: 'date', required: true },
+        { label: '任务状态', name: 'status', type: 'select', options: ['待处理', '已完成'] },
+        { label: '处理建议', name: 'suggestion', type: 'textarea', wide: true }
+      ]
     }
   ],
   actions: [
@@ -143,6 +174,17 @@ module.exports = {
     },
     { id: 'survey-review', label: '完成复查', collection: 'surveys', patches: [{ field: 'status', value: '已复查' }, { field: 'reviewNote', value: '异常已复核' }] },
     { id: 'plan-complete', label: '标记完成', collection: 'plans', patches: [{ field: 'status', value: '已完成' }] },
-    { id: 'plan-reopen', label: '重新打开', collection: 'plans', patches: [{ field: 'status', value: '待执行' }] }
+    { id: 'plan-reopen', label: '重新打开', collection: 'plans', patches: [{ field: 'status', value: '待执行' }] },
+    {
+      id: 'review-complete',
+      label: '完成复查',
+      collection: 'reviews',
+      relation: { collection: 'surveys', localKey: 'surveyId' },
+      patches: [
+        { field: 'status', value: '已完成' },
+        { target: 'related', field: 'status', value: '已复查' },
+        { target: 'related', field: 'reviewNote', valuePath: 'item.suggestion' }
+      ]
+    }
   ]
 };

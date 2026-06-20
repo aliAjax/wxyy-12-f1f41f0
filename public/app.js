@@ -69,12 +69,27 @@ function collectionLabel(collection) {
 function relationLabel(relation, id) {
   const item = state.db[relation.collection]?.find((entry) => entry.id === id);
   if (!item) return '未关联';
-  return relation.labelFields.map((field) => item[field]).filter(Boolean).join(' / ');
+  let label = relation.labelFields.map((field) => item[field]).filter(Boolean).join(' / ');
+  if (relation.withSite && relation.collection === 'surveys' && item.siteId) {
+    const site = state.db.sites?.find((s) => s.id === item.siteId);
+    if (site) {
+      const siteLabel = [site.cave, site.zone, site.pointCode].filter(Boolean).join(' / ');
+      label = `${siteLabel} · ${label}`;
+    }
+  }
+  return label;
 }
 
-function optionList(items, labelFields) {
+function optionList(items, labelFields, options = {}) {
   return items.map((item) => {
-    const label = labelFields.map((field) => item[field]).filter(Boolean).join(' / ');
+    let label = labelFields.map((field) => item[field]).filter(Boolean).join(' / ');
+    if (options.withSite && options.collection === 'surveys' && item.siteId) {
+      const site = state.db.sites?.find((s) => s.id === item.siteId);
+      if (site) {
+        const siteLabel = [site.cave, site.zone, site.pointCode].filter(Boolean).join(' / ');
+        label = `${siteLabel} · ${label}`;
+      }
+    }
     return `<option value="${item.id}">${escapeHtml(label)}</option>`;
   }).join('');
 }
@@ -89,8 +104,9 @@ function formField(field) {
     return `<label class="${field.wide ? 'wide' : ''}">${field.label}<select name="${field.name}" ${required}>${field.options.map((option) => `<option>${escapeHtml(option)}</option>`).join('')}</select></label>`;
   }
   if (field.type === 'relation') {
-    const items = state.db[field.collection] || [];
-    return `<label class="${field.wide ? 'wide' : ''}">${field.label}<select name="${field.name}" ${required}>${optionList(items, field.labelFields)}</select></label>`;
+    let items = state.db[field.collection] || [];
+    if (field.filter) items = items.filter((item) => item[field.filter.field] === field.filter.value);
+    return `<label class="${field.wide ? 'wide' : ''}">${field.label}<select name="${field.name}" ${required}>${optionList(items, field.labelFields, { withSite: field.withSite, collection: field.collection })}</select></label>`;
   }
   if (field.type === 'multirelation') {
     const items = state.db[field.collection] || [];

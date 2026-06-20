@@ -134,14 +134,20 @@ function runAction(db, action, item) {
     if (guard.op === 'levelGte' && (levelRank[left] || 0) < (levelRank[right] || 0)) return { error: guard.message };
     if (guard.op === 'notIn' && guard.values.includes(left)) return { error: guard.message };
   }
+  const stamped = new WeakSet();
+  function stampOnce(target, note) {
+    if (!target || stamped.has(target)) return;
+    target.updatedAt = new Date().toISOString();
+    target.history = target.history || [];
+    target.history.unshift(stamp(action.label, note || '状态流转'));
+    stamped.add(target);
+  }
   for (const patch of action.patches || []) {
     const target = patch.target === 'related' ? related : item;
     if (!target) continue;
     const next = patch.valuePath ? getValue(context, patch.valuePath) : patch.value;
     setValue(target, patch.field, next);
-    target.updatedAt = new Date().toISOString();
-    target.history = target.history || [];
-    target.history.unshift(stamp(action.label, action.note || '状态流转'));
+    stampOnce(target, action.note);
   }
   for (const delta of action.deltas || []) {
     const target = delta.target === 'related' ? related : item;
@@ -151,9 +157,7 @@ function runAction(db, action, item) {
     const amount = sourceAmount * multiplier;
     const current = Number(getValue({ target }, `target.${delta.field}`) || 0);
     setValue(target, delta.field, current + amount);
-    target.updatedAt = new Date().toISOString();
-    target.history = target.history || [];
-    target.history.unshift(stamp(action.label, action.note || '数量调整'));
+    stampOnce(target, action.note || '数量调整');
   }
   return { item };
 }
