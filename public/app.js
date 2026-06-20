@@ -85,6 +85,15 @@ function formField(field) {
     const items = state.db[field.collection] || [];
     return `<label class="${field.wide ? 'wide' : ''}">${field.label}<select name="${field.name}" multiple size="6" ${required}>${optionList(items, field.labelFields)}</select></label>`;
   }
+  if (field.type === 'photos') {
+    return `<div class="photos-field ${field.wide ? 'wide' : ''}">
+      <div class="photos-field-header">
+        <label>${field.label}</label>
+        <button type="button" class="secondary add-photo-btn" data-field="${field.name}">+ 添加照片</button>
+      </div>
+      <div class="photo-entries" data-field="${field.name}"></div>
+    </div>`;
+  }
   return `<label class="${field.wide ? 'wide' : ''}">${field.label}<input type="${field.type || 'text'}" name="${field.name}" ${value} ${required}></label>`;
 }
 
@@ -102,6 +111,84 @@ function historyHtml(item) {
   return `<div class="history">${history.slice(0, 5).map((entry) => `
     <div class="history-item"><span>${fmtDate(entry.at)}</span><span>${escapeHtml(entry.action)}${entry.note ? '：' + escapeHtml(entry.note) : ''}</span></div>
   `).join('')}</div>`;
+}
+
+function photoEntryHtml(fieldName, photo = {}) {
+  return `<div class="photo-entry" data-field="${fieldName}">
+    <div class="photo-entry-header">
+      <span class="photo-entry-index">照片 ${fieldName}</span>
+      <button type="button" class="danger remove-photo-btn">删除</button>
+    </div>
+    <div class="photo-entry-grid">
+      <label>标题<input type="text" data-photo-field="title" value="${escapeHtml(photo.title || '')}" placeholder="例如：栏杆触碰痕迹"></label>
+      <label>图片URL<input type="text" data-photo-field="url" value="${escapeHtml(photo.url || '')}" placeholder="https://..."></label>
+      <label class="wide">拍摄点位<input type="text" data-photo-field="location" value="${escapeHtml(photo.location || '')}" placeholder="例如：北麓三号洞 / 滴水帘区 / D-07"></label>
+      <label class="wide">说明<textarea data-photo-field="description" placeholder="照片描述和现场说明">${escapeHtml(photo.description || '')}</textarea></label>
+    </div>
+  </div>`;
+}
+
+function photosBadgeHtml(item) {
+  const photos = item.photos || [];
+  if (!photos.length) return '';
+  return `<button class="photos-badge" data-view-photos="${item.id}">
+    <span class="photos-icon">📷</span>
+    <span>${photos.length} 张照片</span>
+  </button>`;
+}
+
+function renderPhotoModal(surveyId) {
+  const survey = state.db.surveys?.find((s) => s.id === surveyId);
+  if (!survey || !survey.photos?.length) return;
+  const site = state.db.sites?.find((s) => s.id === survey.siteId);
+  const siteLabel = site ? `${site.cave} / ${site.zone} / ${site.pointCode}` : '';
+  $('#photoModalTitle').textContent = `照片证据 - ${survey.surveyor} / ${survey.date}`;
+  $('#photoModalBody').innerHTML = survey.photos.map((photo, index) => `
+    <div class="photo-detail">
+      <div class="photo-detail-head">
+        <span class="photo-detail-index">照片 ${index + 1}</span>
+        ${photo.title ? `<h3>${escapeHtml(photo.title)}</h3>` : ''}
+      </div>
+      <div class="photo-detail-image">
+        <img src="${escapeHtml(photo.url)}" alt="${escapeHtml(photo.title || '现场照片')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+        <div class="photo-error">
+          <span>📷</span>
+          <p>图片加载失败</p>
+          <a href="${escapeHtml(photo.url)}" target="_blank">在新窗口打开</a>
+        </div>
+      </div>
+      <div class="photo-detail-meta">
+        ${photo.location || siteLabel ? `<div class="photo-meta-item"><span class="meta-label">拍摄点位</span><span>${escapeHtml(photo.location || siteLabel)}</span></div>` : ''}
+        ${photo.description ? `<div class="photo-meta-item"><span class="meta-label">说明</span><span>${escapeHtml(photo.description)}</span></div>` : ''}
+        <div class="photo-meta-item"><span class="meta-label">图片链接</span><a href="${escapeHtml(photo.url)}" target="_blank">${escapeHtml(photo.url)}</a></div>
+      </div>
+    </div>
+  `).join('');
+  $('#photoModal').classList.add('show');
+}
+
+function closePhotoModal() {
+  $('#photoModal').classList.remove('show');
+}
+
+function updatePhotoIndices(container) {
+  const entries = container.querySelectorAll('.photo-entry');
+  entries.forEach((entry, idx) => {
+    const indexEl = entry.querySelector('.photo-entry-index');
+    if (indexEl) {
+      const fieldName = entry.dataset.field;
+      indexEl.textContent = `照片 ${idx + 1}`;
+    }
+  });
+}
+
+function addPhotoEntry(btn) {
+  const fieldName = btn.dataset.field;
+  const container = btn.closest('.photos-field').querySelector('.photo-entries');
+  const entryCount = container.querySelectorAll('.photo-entry').length;
+  const div = document.createElement('div');
+  div.innerHTML = photoEntryHtml(fieldName).replace('照片 ' + fieldName, `照片 ${entryCount + 1}`);
+  container.appendChild(div.firstElementChild);
 }
 
 function values(form, view) {
@@ -122,6 +209,16 @@ function values(form, view) {
       if (!Array.isArray(payload[field.name])) {
         payload[field.name] = payload[field.name] ? [payload[field.name]] : [];
       }
+    }
+    if (field.type === 'photos') {
+      const entries = form.querySelectorAll(`.photo-entry[data-field="${field.name}"]`);
+      payload[field.name] = Array.from(entries).map((entry, idx) => ({
+        id: `photo-${Date.now()}-${idx}`,
+        title: entry.querySelector(`[data-photo-field="title"]`).value.trim(),
+        url: entry.querySelector(`[data-photo-field="url"]`).value.trim(),
+        location: entry.querySelector(`[data-photo-field="location"]`).value.trim(),
+        description: entry.querySelector(`[data-photo-field="description"]`).value.trim()
+      })).filter((photo) => photo.url);
     }
   }
   return { ...view.defaults, ...payload };
@@ -181,7 +278,7 @@ function renderCard(item, collection, view) {
     .map((action) => `<button class="${action.danger ? 'danger' : 'ghost'}" data-action="${action.id}" data-id="${item.id}">${escapeHtml(action.label)}</button>`)
     .join('');
   return `<article class="card">
-    <div class="card-head"><h3>${escapeHtml(title)}</h3>${statusValue ? pill(statusValue, toneFor(statusValue)) : ''}</div>
+    <div class="card-head"><h3>${escapeHtml(title)}</h3><div class="card-head-right">${statusValue ? pill(statusValue, toneFor(statusValue)) : ''}${photosBadgeHtml(item)}</div></div>
     ${relation}
     ${siteListHtml}
     ${summary ? `<p>${escapeHtml(summary)}</p>` : ''}
@@ -266,6 +363,10 @@ async function load() {
 document.addEventListener('click', async (event) => {
   const tab = event.target.closest('.tab');
   const action = event.target.closest('[data-action]');
+  const addPhotoBtn = event.target.closest('.add-photo-btn');
+  const removePhotoBtn = event.target.closest('.remove-photo-btn');
+  const viewPhotosBtn = event.target.closest('[data-view-photos]');
+  const closeModal = event.target.closest('[data-close-modal]');
   if (tab) setTab(tab.dataset.tab);
   if (action) {
     try {
@@ -275,6 +376,21 @@ document.addEventListener('click', async (event) => {
     } catch (error) {
       toast(error.message);
     }
+  }
+  if (addPhotoBtn) {
+    addPhotoEntry(addPhotoBtn);
+  }
+  if (removePhotoBtn) {
+    const entry = removePhotoBtn.closest('.photo-entry');
+    const container = entry.parentElement;
+    entry.remove();
+    updatePhotoIndices(container);
+  }
+  if (viewPhotosBtn) {
+    renderPhotoModal(viewPhotosBtn.dataset.viewPhotos);
+  }
+  if (closeModal) {
+    closePhotoModal();
   }
 });
 
@@ -300,6 +416,12 @@ document.addEventListener('submit', async (event) => {
 });
 
 $('#refreshBtn').addEventListener('click', () => load().then(() => toast('已刷新')));
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    closePhotoModal();
+  }
+});
 
 async function boot() {
   state.config = await api('/api/config');

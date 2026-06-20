@@ -71,8 +71,8 @@ module.exports = {
       formTitle: '登记巡测',
       listTitle: '巡测历史',
       submitLabel: '保存巡测',
-      searchPlaceholder: '搜索人员、干扰痕迹、照片',
-      searchFields: ['surveyor', 'disturbance', 'photoUrl'],
+      searchPlaceholder: '搜索人员、干扰痕迹、照片说明',
+      searchFields: ['surveyor', 'disturbance'],
       statusField: 'status',
       statusOptions: ['正常', '异常待复查', '已复查'],
       titleFields: ['surveyor', 'date'],
@@ -83,7 +83,7 @@ module.exports = {
         { label: '湿度', name: 'humidity' },
         { label: 'CO2', name: 'co2' }
       ],
-      defaults: { status: '正常', reviewNote: '' },
+      defaults: { status: '正常', reviewNote: '', photos: [] },
       fields: [
         { label: '样点', name: 'siteId', type: 'relation', collection: 'sites', labelFields: ['cave', 'zone', 'pointCode'], required: true, wide: true },
         { label: '巡测人员', name: 'surveyor', required: true },
@@ -92,7 +92,7 @@ module.exports = {
         { label: '湿度', name: 'humidity', type: 'number', required: true },
         { label: 'CO2', name: 'co2', type: 'number', required: true },
         { label: '滴水频率', name: 'dripRate', type: 'number', required: true },
-        { label: '照片链接', name: 'photoUrl' },
+        { label: '照片证据', name: 'photos', type: 'photos', wide: true },
         { label: '游客干扰痕迹', name: 'disturbance', type: 'textarea', wide: true }
       ]
     },

@@ -34,7 +34,22 @@
       "co2": 920,
       "dripRate": 12,
       "disturbance": "栏杆外侧有触碰痕迹",
-      "photoUrl": "",
+      "photos": [
+        {
+          "id": "photo-1",
+          "title": "栏杆触碰痕迹",
+          "url": "https://images.unsplash.com/photo-1541974898-8707f6f0d2c2?w=800",
+          "location": "北麓三号洞 / 滴水帘区 / D-07",
+          "description": "游客步道外侧栏杆发现新鲜触碰痕迹，钟乳石表面有轻微划痕"
+        },
+        {
+          "id": "photo-2",
+          "title": "滴水状态记录",
+          "url": "https://images.unsplash.com/photo-1518173946687-a4c036bc3f46?w=800",
+          "location": "北麓三号洞 / 滴水帘区 / D-07",
+          "description": "滴水频率正常，约12滴/分钟，水质清澈"
+        }
+      ],
       "status": "异常待复查",
       "reviewNote": "",
       "createdAt": "2026-06-18T10:00:00.000Z",

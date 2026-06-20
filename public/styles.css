@@ -339,6 +339,251 @@ main {
   }
 }
 
+.card-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.photos-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(17, 97, 92, .1);
+  color: var(--accent);
+  border: 1px solid rgba(17, 97, 92, .3);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: .2s ease;
+}
+
+.photos-badge:hover {
+  background: rgba(17, 97, 92, .18);
+}
+
+.photos-badge .photos-icon {
+  font-size: 14px;
+}
+
+.photos-field {
+  display: grid;
+  gap: 10px;
+}
+
+.photos-field-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.photos-field-header label {
+  margin: 0;
+}
+
+.photo-entries {
+  display: grid;
+  gap: 12px;
+}
+
+.photo-entry {
+  background: #f7f3eb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.photo-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.photo-entry-index {
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.photo-entry .remove-photo-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.photo-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.photo-entry-grid label {
+  font-size: 12px;
+}
+
+.photo-entry-grid textarea {
+  min-height: 60px;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal.show {
+  display: flex;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(32, 32, 29, .7);
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  position: relative;
+  background: var(--panel);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .3);
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.modal-body {
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.photo-detail {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.photo-detail:last-child {
+  margin-bottom: 0;
+}
+
+.photo-detail-head {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.photo-detail-index {
+  background: var(--accent);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.photo-detail-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.photo-detail-image {
+  position: relative;
+  background: #1a1a1a;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-detail-image img {
+  max-width: 100%;
+  max-height: 500px;
+  display: block;
+}
+
+.photo-error {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.photo-error span {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.photo-error p {
+  margin: 0 0 12px;
+}
+
+.photo-error a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.photo-detail-meta {
+  padding: 16px 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.photo-meta-item {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.meta-label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.photo-meta-item a {
+  color: var(--accent);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.photo-meta-item a:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 620px) {
   header {
     position: static;
@@ -349,14 +594,42 @@ main {
     flex-direction: column;
   }
 
+  .card-head-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .stats,
   .form-grid,
   .detail,
-  .toolbar {
+  .toolbar,
+  .photo-entry-grid {
     grid-template-columns: 1fr;
   }
 
   .history-item {
     grid-template-columns: 1fr;
+  }
+
+  .photo-meta-item {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .modal {
+    padding: 0;
+  }
+
+  .modal-content {
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .modal-header {
+    padding: 14px 16px;
+  }
+
+  .modal-body {
+    padding: 16px;
   }
 }
