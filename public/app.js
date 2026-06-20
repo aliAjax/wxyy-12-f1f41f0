@@ -81,6 +81,10 @@ function formField(field) {
     const items = state.db[field.collection] || [];
     return `<label class="${field.wide ? 'wide' : ''}">${field.label}<select name="${field.name}" ${required}>${optionList(items, field.labelFields)}</select></label>`;
   }
+  if (field.type === 'multirelation') {
+    const items = state.db[field.collection] || [];
+    return `<label class="${field.wide ? 'wide' : ''}">${field.label}<select name="${field.name}" multiple size="6" ${required}>${optionList(items, field.labelFields)}</select></label>`;
+  }
   return `<label class="${field.wide ? 'wide' : ''}">${field.label}<input type="${field.type || 'text'}" name="${field.name}" ${value} ${required}></label>`;
 }
 
@@ -101,9 +105,24 @@ function historyHtml(item) {
 }
 
 function values(form, view) {
-  const payload = Object.fromEntries(new FormData(form).entries());
+  const payload = {};
+  const formData = new FormData(form);
+  for (const [key, value] of formData.entries()) {
+    if (payload[key] === undefined) {
+      payload[key] = value;
+    } else if (Array.isArray(payload[key])) {
+      payload[key].push(value);
+    } else {
+      payload[key] = [payload[key], value];
+    }
+  }
   for (const field of view.fields) {
     if (field.type === 'number') payload[field.name] = Number(payload[field.name] || 0);
+    if (field.type === 'multirelation') {
+      if (!Array.isArray(payload[field.name])) {
+        payload[field.name] = payload[field.name] ? [payload[field.name]] : [];
+      }
+    }
   }
   return { ...view.defaults, ...payload };
 }
@@ -134,10 +153,28 @@ function renderCard(item, collection, view) {
   const statusValue = item[view.statusField];
   const relation = view.relation ? `<div class="meta">${escapeHtml(relationLabel(view.relation, item[view.relation.localKey]))}</div>` : '';
   const details = (view.detailFields || []).map((field) => {
-    const raw = item[field.name];
-    const value = field.type === 'relation' ? relationLabel(field, raw) : raw;
+    let raw = item[field.name];
+    if (field.name === 'siteCount' && Array.isArray(item.siteIds)) {
+      raw = item.siteIds.length + ' 个';
+    }
+    let value;
+    if (field.type === 'relation') {
+      value = relationLabel(field, raw);
+    } else if (field.type === 'multirelation' && Array.isArray(raw)) {
+      const items = state.db[field.collection] || [];
+      value = raw.map((id) => {
+        const relItem = items.find((entry) => entry.id === id);
+        return relItem ? field.labelFields.map((f) => relItem[f]).filter(Boolean).join(' / ') : id;
+      }).join('、');
+    } else {
+      value = raw;
+    }
     return `<div>${escapeHtml(field.label)}<br><strong>${escapeHtml(value || '-')}</strong></div>`;
   }).join('');
+  const siteListHtml = (Array.isArray(item.siteIds) && item.siteIds.length) ? `<div class="meta">样点：${escapeHtml(item.siteIds.map((id) => {
+    const site = state.db.sites?.find((s) => s.id === id);
+    return site ? [site.cave, site.zone, site.pointCode].filter(Boolean).join(' / ') : id;
+  }).join('、'))}</div>` : '';
   const summary = (view.summaryFields || []).map((field) => item[field]).filter(Boolean).join(' · ');
   const actions = state.config.actions
     .filter((action) => action.collection === collection)
@@ -146,6 +183,7 @@ function renderCard(item, collection, view) {
   return `<article class="card">
     <div class="card-head"><h3>${escapeHtml(title)}</h3>${statusValue ? pill(statusValue, toneFor(statusValue)) : ''}</div>
     ${relation}
+    ${siteListHtml}
     ${summary ? `<p>${escapeHtml(summary)}</p>` : ''}
     ${details ? `<div class="detail">${details}</div>` : ''}
     ${actions ? `<div class="actions">${actions}</div>` : ''}
@@ -157,12 +195,16 @@ function renderList(view) {
   const collection = view.collection;
   const query = $(`#search-${view.id}`)?.value.trim() || '';
   const status = $(`#status-${view.id}`)?.value || '';
+  const filterValue = view.filterField ? ($(`#filter-${view.id}`)?.value || '') : '';
   let items = [...(state.db[collection] || [])];
   if (query) {
     items = items.filter((item) => view.searchFields.some((field) => String(item[field] || '').includes(query)));
   }
   if (status) {
     items = items.filter((item) => item[view.statusField] === status);
+  }
+  if (filterValue && view.filterField) {
+    items = items.filter((item) => item[view.filterField] === filterValue);
   }
   return items.length ? items.map((item) => renderCard(item, collection, view)).join('') : `<div class="empty">暂无${escapeHtml(collectionLabel(collection))}</div>`;
 }
@@ -181,6 +223,7 @@ function renderDashboardView(view) {
 
 function renderCrudView(view) {
   const statusOptions = view.statusOptions || [];
+  const filterOptions = view.filterField ? [...new Set((state.db[view.collection] || []).map((item) => item[view.filterField]).filter(Boolean))] : [];
   return `<section class="view" id="${view.id}">
     <div class="grid">
       <form class="panel" data-create="${view.collection}" data-view="${view.id}">
@@ -196,6 +239,10 @@ function renderCrudView(view) {
             <option value="">全部状态</option>
             ${statusOptions.map((option) => `<option>${escapeHtml(option)}</option>`).join('')}
           </select>
+          ${view.filterField ? `<select id="filter-${view.id}">
+            <option value="">全部${escapeHtml(view.filterLabel || view.filterField)}</option>
+            ${filterOptions.map((option) => `<option>${escapeHtml(option)}</option>`).join('')}
+          </select>` : ''}
         </div>
         <div class="list" id="list-${view.id}">${renderList(view)}</div>
       </div>
@@ -232,7 +279,12 @@ document.addEventListener('click', async (event) => {
 });
 
 document.addEventListener('input', (event) => {
-  const view = state.config.views.find((entry) => entry.id && (event.target.id === `search-${entry.id}` || event.target.id === `status-${entry.id}`));
+  const view = state.config.views.find((entry) => entry.id && (event.target.id === `search-${entry.id}` || event.target.id === `status-${entry.id}` || event.target.id === `filter-${entry.id}`));
+  if (view) $(`#list-${view.id}`).innerHTML = renderList(view);
+});
+
+document.addEventListener('change', (event) => {
+  const view = state.config.views.find((entry) => entry.id && (event.target.id === `status-${entry.id}` || event.target.id === `filter-${entry.id}`));
   if (view) $(`#list-${view.id}`).innerHTML = renderList(view);
 });
 
