@@ -45,6 +45,17 @@ function valueByPath(source, pathName) {
   return pathName.split('.').reduce((value, key) => value?.[key], source);
 }
 
+function searchValueByPath(source, pathName) {
+  const keys = pathName.split('.');
+  const walk = (value, index) => {
+    if (value === undefined || value === null) return [];
+    if (Array.isArray(value)) return value.flatMap((entry) => walk(entry, index));
+    if (index >= keys.length) return [value];
+    return walk(value[keys[index]], index + 1);
+  };
+  return walk(source, 0).map((value) => String(value)).join(' ');
+}
+
 function displayField(item, field) {
   const value = item[field.name] ?? '';
   if (field.type === 'select' && field.options) return value || field.options[0];
@@ -295,7 +306,7 @@ function renderList(view) {
   const filterValue = view.filterField ? ($(`#filter-${view.id}`)?.value || '') : '';
   let items = [...(state.db[collection] || [])];
   if (query) {
-    items = items.filter((item) => view.searchFields.some((field) => String(item[field] || '').includes(query)));
+    items = items.filter((item) => view.searchFields.some((field) => searchValueByPath(item, field).includes(query)));
   }
   if (status) {
     items = items.filter((item) => item[view.statusField] === status);

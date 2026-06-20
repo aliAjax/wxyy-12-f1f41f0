@@ -72,7 +72,7 @@ module.exports = {
       listTitle: '巡测历史',
       submitLabel: '保存巡测',
       searchPlaceholder: '搜索人员、干扰痕迹、照片说明',
-      searchFields: ['surveyor', 'disturbance'],
+      searchFields: ['surveyor', 'disturbance', 'photos.title', 'photos.location', 'photos.description'],
       statusField: 'status',
       statusOptions: ['正常', '异常待复查', '已复查'],
       titleFields: ['surveyor', 'date'],
