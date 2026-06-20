@@ -45,6 +45,17 @@ function valueByPath(source, pathName) {
   return pathName.split('.').reduce((value, key) => value?.[key], source);
 }
 
+function setValueByPath(target, pathName, value) {
+  const keys = pathName.split('.');
+  let cursor = target;
+  while (keys.length > 1) {
+    const key = keys.shift();
+    cursor[key] = cursor[key] || {};
+    cursor = cursor[key];
+  }
+  cursor[keys[0]] = value;
+}
+
 function searchValueByPath(source, pathName) {
   const keys = pathName.split('.');
   const walk = (value, index) => {
@@ -272,6 +283,26 @@ function renderStats() {
   }).join('')}</div>`;
 }
 
+function autoRiskHtml(item) {
+  if (!item.autoRiskLevel || item.autoRiskLevel === '正常') return '';
+  const tone = item.autoRiskLevel === '高风险' ? 'bad' : 'warn';
+  const reasons = (item.autoRiskReasons || []).map((r) => `<li>${escapeHtml(r)}</li>`).join('');
+  const reviewedBadge = item.manuallyReviewed ? '<span class="auto-risk-reviewed" title="已人工复查，自动判定结果仅供参考">已人工复核</span>' : '';
+  return `<div class="auto-risk ${tone}">
+    <div class="auto-risk-head">
+      <span class="auto-risk-label">自动判定</span>
+      ${pill(item.autoRiskLevel, tone)}
+      ${reviewedBadge}
+    </div>
+    ${reasons ? `<ul class="auto-risk-reasons">${reasons}</ul>` : ''}
+    <div class="auto-risk-deviations">
+      <span>温度偏差 <strong>${Number(item.deviationTemp || 0).toFixed(1)}℃</strong></span>
+      <span>湿度偏差 <strong>${Number(item.deviationHumidity || 0).toFixed(1)}%</strong></span>
+      <span>CO2偏差 <strong>${Number(item.deviationCo2 || 0).toFixed(0)}ppm</strong></span>
+    </div>
+  </div>`;
+}
+
 function renderCard(item, collection, view) {
   const title = view.titleFields.map((field) => item[field]).filter(Boolean).join(' / ') || item.id;
   const statusValue = item[view.statusField];
@@ -309,6 +340,7 @@ function renderCard(item, collection, view) {
     ${relation}
     ${siteListHtml}
     ${summary ? `<p>${escapeHtml(summary)}</p>` : ''}
+    ${autoRiskHtml(item)}
     ${details ? `<div class="detail">${details}</div>` : ''}
     ${actions ? `<div class="actions">${actions}</div>` : ''}
     ${historyHtml(item)}
@@ -333,6 +365,44 @@ function renderList(view) {
   return items.length ? items.map((item) => renderCard(item, collection, view)).join('') : `<div class="empty">暂无${escapeHtml(collectionLabel(collection))}</div>`;
 }
 
+function renderHighRiskSummary() {
+  const surveys = state.db.surveys || [];
+  const highRiskItems = surveys.filter((s) => s.autoRiskLevel === '高风险');
+  const warningItems = surveys.filter((s) => s.autoRiskLevel === '预警');
+  if (!highRiskItems.length && !warningItems.length) return '';
+  const summaryRows = [];
+  for (const item of highRiskItems) {
+    const site = state.db.sites?.find((s) => s.id === item.siteId);
+    const siteLabel = site ? `${site.cave} / ${site.zone} / ${site.pointCode}` : item.siteId;
+    const reasons = (item.autoRiskReasons || []).join('；');
+    summaryRows.push(`<div class="risk-summary-row bad">
+      <div class="risk-summary-level">${pill('高风险', 'bad')}</div>
+      <div class="risk-summary-info">
+        <div class="risk-summary-title">${escapeHtml(siteLabel)} · ${escapeHtml(item.surveyor)} / ${escapeHtml(item.date)}</div>
+        <div class="risk-summary-reasons">${escapeHtml(reasons)}</div>
+      </div>
+      <div class="risk-summary-status">${pill(item.status || '', toneFor(item.status))}</div>
+    </div>`);
+  }
+  for (const item of warningItems) {
+    const site = state.db.sites?.find((s) => s.id === item.siteId);
+    const siteLabel = site ? `${site.cave} / ${site.zone} / ${site.pointCode}` : item.siteId;
+    const reasons = (item.autoRiskReasons || []).join('；');
+    summaryRows.push(`<div class="risk-summary-row warn">
+      <div class="risk-summary-level">${pill('预警', 'warn')}</div>
+      <div class="risk-summary-info">
+        <div class="risk-summary-title">${escapeHtml(siteLabel)} · ${escapeHtml(item.surveyor)} / ${escapeHtml(item.date)}</div>
+        <div class="risk-summary-reasons">${escapeHtml(reasons)}</div>
+      </div>
+      <div class="risk-summary-status">${pill(item.status || '', toneFor(item.status))}</div>
+    </div>`);
+  }
+  return `<div class="panel high-risk-panel">
+    <h2>高风险与预警摘要</h2>
+    <div class="risk-summary-list">${summaryRows.join('')}</div>
+  </div>`;
+}
+
 function renderDashboardView(view) {
   const source = view.focus;
   let items = [...(state.db[source.collection] || [])];
@@ -341,7 +411,27 @@ function renderDashboardView(view) {
   const cardView = state.config.views.find((entry) => entry.collection === source.collection) || source;
   return `<section class="view active" id="${view.id}">
     ${renderStats()}
+    ${renderHighRiskSummary()}
     <div class="panel"><h2>${escapeHtml(view.focusTitle)}</h2><div class="list">${items.length ? items.map((item) => renderCard(item, source.collection, cardView)).join('') : '<div class="empty">暂无重点事项</div>'}</div></div>
+  </section>`;
+}
+
+function renderConfigView(view) {
+  const rules = state.config.thresholdRules || {};
+  const fieldsHtml = view.thresholdFields.map((field) => {
+    const value = valueByPath(rules, field.name);
+    const required = field.required ? 'required' : '';
+    return `<label class="${field.wide ? 'wide' : ''}">${field.label}<input type="${field.type || 'number'}" name="${field.name}" value="${escapeHtml(value)}" ${required}></label>`;
+  }).join('');
+  return `<section class="view" id="${view.id}">
+    <div class="grid single">
+      <form class="panel" data-config-thresholds data-view="${view.id}">
+        <h2>${escapeHtml(view.formTitle)}</h2>
+        <p class="config-desc">设置各环境参数的预警和高风险偏差阈值。当巡测实测值与样点基准值的偏差达到对应阈值时，系统将自动判定风险等级。</p>
+        <div class="form-grid">${fieldsHtml}</div>
+        <div class="actions"><button>${escapeHtml(view.submitLabel || '保存')}</button></div>
+      </form>
+    </div>
   </section>`;
 }
 
@@ -378,7 +468,11 @@ function render() {
   $('#title').textContent = state.config.title;
   document.title = state.config.title;
   $('#lede').textContent = state.config.lede;
-  $('#main').innerHTML = state.config.views.map((view) => view.type === 'dashboard' ? renderDashboardView(view) : renderCrudView(view)).join('');
+  $('#main').innerHTML = state.config.views.map((view) => {
+    if (view.type === 'dashboard') return renderDashboardView(view);
+    if (view.type === 'config') return renderConfigView(view);
+    return renderCrudView(view);
+  }).join('');
   setTab(state.activeTab || state.config.views[0].id);
 }
 
@@ -432,14 +526,38 @@ document.addEventListener('change', (event) => {
 });
 
 document.addEventListener('submit', async (event) => {
-  const form = event.target.closest('[data-create]');
-  if (!form) return;
-  event.preventDefault();
-  const view = state.config.views.find((entry) => entry.id === form.dataset.view);
-  await api(`/api/${form.dataset.create}`, { method: 'POST', body: JSON.stringify(values(form, view)) });
-  form.reset();
-  await load();
-  toast('已保存');
+  const createForm = event.target.closest('[data-create]');
+  const configForm = event.target.closest('[data-config-thresholds]');
+  
+  if (createForm) {
+    event.preventDefault();
+    const view = state.config.views.find((entry) => entry.id === createForm.dataset.view);
+    const result = await api(`/api/${createForm.dataset.create}`, { method: 'POST', body: JSON.stringify(values(createForm, view)) });
+    createForm.reset();
+    await load();
+    if (result && result.autoRiskLevel && result.autoRiskLevel !== '正常') {
+      toast(`自动判定：${result.autoRiskLevel} - ${(result.autoRiskReasons || []).join('；')}`);
+    } else {
+      toast('已保存');
+    }
+  }
+  
+  if (configForm) {
+    event.preventDefault();
+    const formData = new FormData(configForm);
+    const payload = {};
+    for (const [key, value] of formData.entries()) {
+      setValueByPath(payload, key, Number(value));
+    }
+    try {
+      const result = await api('/api/config/thresholdRules', { method: 'PATCH', body: JSON.stringify(payload) });
+      state.config.thresholdRules = result;
+      render();
+      toast('阈值规则已保存');
+    } catch (error) {
+      toast(error.message);
+    }
+  }
 });
 
 $('#refreshBtn').addEventListener('click', () => load().then(() => toast('已刷新')));

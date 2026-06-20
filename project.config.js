@@ -7,11 +7,18 @@ module.exports = {
     '正常': 'ok',
     '已复查': 'ok',
     '已完成': 'ok',
-    '重点保护': 'warn',
     '待执行': 'warn',
     '待处理': 'warn',
+    '重点保护': 'warn',
+    '预警': 'warn',
     '异常待复查': 'bad',
+    '高风险': 'bad',
     '暂停开放': 'bad'
+  },
+  thresholdRules: {
+    temperature: { warning: 2, critical: 4 },
+    humidity: { warning: 10, critical: 20 },
+    co2: { warning: 200, critical: 400 }
   },
   collections: {
     sites: { label: '样点档案' },
@@ -24,6 +31,8 @@ module.exports = {
     { label: '重点保护', collection: 'sites', filter: { field: 'protectedStatus', value: '重点保护' } },
     { label: '巡测记录', collection: 'surveys' },
     { label: '待复查', collection: 'surveys', filter: { field: 'status', value: '异常待复查' } },
+    { label: '自动预警', collection: 'surveys', filter: { field: 'autoRiskLevel', value: '预警' } },
+    { label: '自动高风险', collection: 'surveys', filter: { field: 'autoRiskLevel', value: '高风险' } },
     { label: '巡测计划', collection: 'plans' },
     { label: '待执行', collection: 'plans', filter: { field: 'status', value: '待执行' } },
     { label: '复查任务', collection: 'reviews' },
@@ -36,6 +45,21 @@ module.exports = {
       type: 'dashboard',
       focusTitle: '异常与复查',
       focus: { collection: 'surveys', field: 'status', values: ['异常待复查'], limit: 8 }
+    },
+    {
+      id: 'config',
+      label: '阈值规则',
+      type: 'config',
+      formTitle: '阈值规则配置',
+      submitLabel: '保存规则',
+      thresholdFields: [
+        { label: '温度预警阈值(℃)', name: 'temperature.warning', type: 'number', required: true },
+        { label: '温度高风险阈值(℃)', name: 'temperature.critical', type: 'number', required: true },
+        { label: '湿度预警阈值(%)', name: 'humidity.warning', type: 'number', required: true },
+        { label: '湿度高风险阈值(%)', name: 'humidity.critical', type: 'number', required: true },
+        { label: 'CO2预警阈值(ppm)', name: 'co2.warning', type: 'number', required: true },
+        { label: 'CO2高风险阈值(ppm)', name: 'co2.critical', type: 'number', required: true }
+      ]
     },
     {
       id: 'sites',
@@ -85,9 +109,13 @@ module.exports = {
       detailFields: [
         { label: '温度', name: 'temperature' },
         { label: '湿度', name: 'humidity' },
-        { label: 'CO2', name: 'co2' }
+        { label: 'CO2', name: 'co2' },
+        { label: '自动风险等级', name: 'autoRiskLevel' },
+        { label: '温度偏差', name: 'deviationTemp' },
+        { label: '湿度偏差', name: 'deviationHumidity' },
+        { label: 'CO2偏差', name: 'deviationCo2' }
       ],
-      defaults: { status: '正常', reviewNote: '', photos: [] },
+      defaults: { status: '正常', reviewNote: '', photos: [], autoRiskLevel: '', autoRiskReasons: [], deviationTemp: 0, deviationHumidity: 0, deviationCo2: 0 },
       fields: [
         { label: '样点', name: 'siteId', type: 'relation', collection: 'sites', labelFields: ['cave', 'zone', 'pointCode'], required: true, wide: true },
         { label: '巡测人员', name: 'surveyor', required: true },

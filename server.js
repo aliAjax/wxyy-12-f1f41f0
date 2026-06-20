@@ -31,8 +31,40 @@ function sortNewest(a, b) {
   return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
 }
 
-app.get('/api/config', (req, res) => {
-  res.json(config);
+function getThresholdRules(db) {
+  const dbRules = db?.thresholdRules || {};
+  const defaultRules = config.thresholdRules || {};
+  const result = {};
+  for (const key of ['temperature', 'humidity', 'co2']) {
+    result[key] = {
+      warning: dbRules[key]?.warning ?? defaultRules[key]?.warning ?? 0,
+      critical: dbRules[key]?.critical ?? defaultRules[key]?.critical ?? 0
+    };
+  }
+  return result;
+}
+
+app.get('/api/config', async (req, res) => {
+  const db = await readDb();
+  const thresholdRules = getThresholdRules(db);
+  res.json({ ...config, thresholdRules });
+});
+
+app.patch('/api/config/thresholdRules', async (req, res) => {
+  const newRules = req.body;
+  if (!newRules || typeof newRules !== 'object') return res.status(400).json({ error: 'invalid rules' });
+  const db = await readDb();
+  db.thresholdRules = db.thresholdRules || {};
+  for (const key of ['temperature', 'humidity', 'co2']) {
+    if (newRules[key]) {
+      db.thresholdRules[key] = db.thresholdRules[key] || {};
+      if (typeof newRules[key].warning === 'number') db.thresholdRules[key].warning = newRules[key].warning;
+      if (typeof newRules[key].critical === 'number') db.thresholdRules[key].critical = newRules[key].critical;
+    }
+  }
+  await writeDb(db);
+  config.thresholdRules = getThresholdRules(db);
+  res.json(config.thresholdRules);
 });
 
 app.get('/api/db', async (req, res) => {
@@ -43,11 +75,47 @@ app.get('/api/db', async (req, res) => {
   res.json(db);
 });
 
+function computeAutoRisk(survey, site, rules) {
+  if (!site) return { autoRiskLevel: '', autoRiskReasons: [], deviationTemp: 0, deviationHumidity: 0, deviationCo2: 0 };
+  const deviationTemp = Math.abs(Number(survey.temperature || 0) - Number(site.baselineTemp || 0));
+  const deviationHumidity = Math.abs(Number(survey.humidity || 0) - Number(site.baselineHumidity || 0));
+  const deviationCo2 = Math.abs(Number(survey.co2 || 0) - Number(site.baselineCo2 || 0));
+  const reasons = [];
+  let level = '';
+  const tr = rules || {};
+  const tempRule = tr.temperature || {};
+  const humRule = tr.humidity || {};
+  const co2Rule = tr.co2 || {};
+  if (deviationTemp >= (tempRule.critical || 4)) {
+    reasons.push(`温度偏差${deviationTemp.toFixed(1)}℃≥${tempRule.critical}℃(高风险阈值)`);
+    level = '高风险';
+  } else if (deviationTemp >= (tempRule.warning || 2)) {
+    reasons.push(`温度偏差${deviationTemp.toFixed(1)}℃≥${tempRule.warning}℃(预警阈值)`);
+    if (level !== '高风险') level = '预警';
+  }
+  if (deviationHumidity >= (humRule.critical || 20)) {
+    reasons.push(`湿度偏差${deviationHumidity.toFixed(1)}%≥${humRule.critical}%(高风险阈值)`);
+    level = '高风险';
+  } else if (deviationHumidity >= (humRule.warning || 10)) {
+    reasons.push(`湿度偏差${deviationHumidity.toFixed(1)}%≥${humRule.warning}%(预警阈值)`);
+    if (level !== '高风险') level = '预警';
+  }
+  if (deviationCo2 >= (co2Rule.critical || 400)) {
+    reasons.push(`CO2偏差${deviationCo2.toFixed(0)}ppm≥${co2Rule.critical}ppm(高风险阈值)`);
+    level = '高风险';
+  } else if (deviationCo2 >= (co2Rule.warning || 200)) {
+    reasons.push(`CO2偏差${deviationCo2.toFixed(0)}ppm≥${co2Rule.warning}ppm(预警阈值)`);
+    if (level !== '高风险') level = '预警';
+  }
+  return { autoRiskLevel: level || '正常', autoRiskReasons: reasons, deviationTemp, deviationHumidity, deviationCo2 };
+}
+
 app.post('/api/:collection', async (req, res) => {
   const db = await readDb();
   const { collection } = req.params;
   if (!Array.isArray(db[collection])) return res.status(404).json({ error: 'unknown collection' });
   const now = new Date().toISOString();
+  const thresholdRules = getThresholdRules(db);
   const item = {
     id: `${collection}-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
     ...req.body,
@@ -55,6 +123,21 @@ app.post('/api/:collection', async (req, res) => {
     updatedAt: now,
     history: [stamp('创建', req.body.note || req.body.memo || '')]
   };
+  if (collection === 'surveys' && item.siteId) {
+    const site = db.sites?.find((s) => s.id === item.siteId);
+    const risk = computeAutoRisk(item, site, thresholdRules);
+    item.autoRiskLevel = risk.autoRiskLevel;
+    item.autoRiskReasons = risk.autoRiskReasons;
+    item.deviationTemp = risk.deviationTemp;
+    item.deviationHumidity = risk.deviationHumidity;
+    item.deviationCo2 = risk.deviationCo2;
+    item.manuallyReviewed = false;
+    if (risk.autoRiskLevel === '高风险' && (!item.status || item.status === '正常')) {
+      item.status = '异常待复查';
+    }
+    const riskNote = risk.autoRiskLevel !== '正常' ? `自动判定：${risk.autoRiskLevel}（${risk.autoRiskReasons.join('；')}）` : '自动判定：正常';
+    item.history[0] = stamp('创建', `${req.body.note || req.body.memo || ''}${req.body.note || req.body.memo ? '；' : ''}${riskNote}`);
+  }
   db[collection].push(item);
   await writeDb(db);
   res.status(201).json(item);
@@ -68,7 +151,27 @@ app.patch('/api/:collection/:id', async (req, res) => {
   if (!item) return res.status(404).json({ error: 'not found' });
   const historyAction = req.body.historyAction;
   delete req.body.historyAction;
+  const thresholdRules = getThresholdRules(db);
+  const oldStatus = item.status;
   Object.assign(item, req.body, { updatedAt: new Date().toISOString() });
+  if (collection === 'surveys') {
+    if (req.body.status && req.body.status !== oldStatus) {
+      item.manuallyReviewed = true;
+    }
+    const hasMeasurementChanges = req.body.temperature !== undefined || req.body.humidity !== undefined || req.body.co2 !== undefined;
+    if (hasMeasurementChanges && item.siteId) {
+      const site = db.sites?.find((s) => s.id === item.siteId);
+      const risk = computeAutoRisk(item, site, thresholdRules);
+      item.autoRiskLevel = risk.autoRiskLevel;
+      item.autoRiskReasons = risk.autoRiskReasons;
+      item.deviationTemp = risk.deviationTemp;
+      item.deviationHumidity = risk.deviationHumidity;
+      item.deviationCo2 = risk.deviationCo2;
+      if (!item.manuallyReviewed && risk.autoRiskLevel === '高风险' && item.status === '正常') {
+        item.status = '异常待复查';
+      }
+    }
+  }
   item.history = item.history || [];
   if (historyAction || req.body.note || req.body.memo || req.body.status) {
     item.history.unshift(stamp(historyAction || req.body.status || '更新', req.body.note || req.body.memo || ''));
@@ -147,6 +250,9 @@ function runAction(db, action, item) {
     if (!target) continue;
     const next = patch.valuePath ? getValue(context, patch.valuePath) : patch.value;
     setValue(target, patch.field, next);
+    if (action.collection === 'surveys' && patch.target !== 'related' && patch.field === 'status') {
+      target.manuallyReviewed = true;
+    }
     stampOnce(target, action.note);
   }
   for (const delta of action.deltas || []) {

@@ -149,7 +149,7 @@ main {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 20px;
 }
@@ -185,6 +185,18 @@ main {
   grid-template-columns: minmax(280px, 420px) 1fr;
   gap: 18px;
   align-items: start;
+}
+
+.grid.single {
+  grid-template-columns: minmax(280px, 560px);
+  justify-content: center;
+}
+
+.config-desc {
+  color: var(--muted);
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .form-grid {
@@ -584,6 +596,112 @@ main {
   text-decoration: underline;
 }
 
+.auto-risk {
+  margin-top: 10px;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.auto-risk.warn {
+  background: rgba(163, 92, 0, .08);
+  border: 1px solid rgba(163, 92, 0, .25);
+}
+
+.auto-risk.bad {
+  background: rgba(161, 61, 61, .08);
+  border: 1px solid rgba(161, 61, 61, .25);
+}
+
+.auto-risk-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.auto-risk-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.auto-risk-reasons {
+  margin: 0 0 6px;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.auto-risk-deviations {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.auto-risk-deviations strong {
+  color: var(--ink);
+}
+
+.auto-risk-reviewed {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ok);
+  background: rgba(38, 115, 77, .12);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.high-risk-panel {
+  margin-bottom: 20px;
+}
+
+.risk-summary-list {
+  display: grid;
+  gap: 10px;
+}
+
+.risk-summary-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+}
+
+.risk-summary-row.bad {
+  border-left: 3px solid var(--bad);
+}
+
+.risk-summary-row.warn {
+  border-left: 3px solid var(--warn);
+}
+
+.risk-summary-info {
+  min-width: 0;
+}
+
+.risk-summary-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.risk-summary-reasons {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.risk-summary-status {
+  white-space: nowrap;
+}
+
 @media (max-width: 620px) {
   header {
     position: static;
@@ -605,6 +723,14 @@ main {
   .toolbar,
   .photo-entry-grid {
     grid-template-columns: 1fr;
+  }
+
+  .risk-summary-row {
+    grid-template-columns: auto 1fr;
+  }
+
+  .risk-summary-status {
+    grid-column: 1 / -1;
   }
 
   .history-item {
