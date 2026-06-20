@@ -758,4 +758,194 @@ main {
   .modal-body {
     padding: 16px;
   }
+
+  .drafts-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.muted-text {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  margin-left: 6px;
+  background: var(--bad);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.tab-drafts {
+  position: relative;
+}
+
+.tab-drafts.active {
+  background: linear-gradient(135deg, #7a5a1b, #a35c00);
+}
+
+.draft-pill {
+  background: linear-gradient(135deg, rgba(163, 92, 0, .18), rgba(200, 140, 30, .14));
+  color: #7a4a00;
+  border: 1px dashed rgba(163, 92, 0, .55);
+  font-weight: 700;
+  letter-spacing: .3px;
+}
+
+.draft-card {
+  background: linear-gradient(180deg, #fff8ea 0%, #fff3d9 100%);
+  border: 2px dashed rgba(163, 92, 0, .35);
+  position: relative;
+  transition: box-shadow .2s ease, border-color .2s ease, transform .1s ease;
+}
+
+.draft-card::before {
+  content: '离线暂存';
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: rgba(163, 92, 0, .45);
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.draft-card:hover {
+  border-color: rgba(163, 92, 0, .6);
+  box-shadow: 0 10px 24px rgba(163, 92, 0, .12);
+}
+
+.draft-card.is-selected {
+  border-color: var(--accent);
+  border-style: solid;
+  box-shadow: 0 0 0 3px rgba(17, 97, 92, .15);
+}
+
+.draft-card.has-error {
+  border-color: var(--bad);
+  background: linear-gradient(180deg, #fdf1f1 0%, #fbe4e4 100%);
+}
+
+.draft-card.has-error::before {
+  color: rgba(161, 61, 61, .55);
+  content: '提交失败';
+}
+
+.draft-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.draft-check input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.draft-check span {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border: 2px solid var(--line);
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: .15s ease;
+}
+
+.draft-check input:checked + span {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.draft-check input:checked + span::after {
+  content: '✓';
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.draft-meta {
+  border-top: 1px dashed rgba(163, 92, 0, .25);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.draft-error {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(161, 61, 61, .1);
+  border: 1px solid rgba(161, 61, 61, .35);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.draft-error strong {
+  display: block;
+  color: var(--bad);
+  margin-bottom: 3px;
+}
+
+.draft-error p {
+  margin: 0;
+  color: #722;
+  line-height: 1.5;
+}
+
+.drafts-toolbar-panel {
+  margin-bottom: 18px;
+  background: linear-gradient(180deg, #fffdf4, #fff8e6);
+  border: 1px solid rgba(163, 92, 0, .25);
+}
+
+.drafts-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.check-all-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.check-all-label input {
+  width: auto;
+  cursor: pointer;
+}
+
+#drafts .panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }

@@ -129,6 +129,93 @@
         }
       ],
       "manuallyReviewed": true
+    },
+    {
+      "id": "surveys-1781974373860-05b01",
+      "status": "正常",
+      "reviewNote": "",
+      "photos": [],
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 1.3000000000000007,
+      "deviationHumidity": 2,
+      "deviationCo2": 40,
+      "siteId": "site-seed-1",
+      "surveyor": "张巡测员",
+      "date": "2026-06-21",
+      "temperature": 17.5,
+      "humidity": 90,
+      "co2": 720,
+      "dripRate": 15,
+      "disturbance": "测试离线草稿功能",
+      "createdAt": "2026-06-20T16:52:53.860Z",
+      "updatedAt": "2026-06-20T16:52:53.860Z",
+      "history": [
+        {
+          "at": "2026-06-20T16:52:53.860Z",
+          "action": "创建",
+          "note": "自动判定：正常"
+        }
+      ],
+      "manuallyReviewed": false
+    },
+    {
+      "id": "surveys-1781974498980-33b3e",
+      "status": "正常",
+      "reviewNote": "",
+      "photos": [],
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 0.6000000000000014,
+      "deviationHumidity": 1,
+      "deviationCo2": 30,
+      "siteId": "site-seed-1",
+      "surveyor": "王巡测员B",
+      "date": "2026-06-19",
+      "temperature": 16.8,
+      "humidity": 93,
+      "co2": 650,
+      "dripRate": 18,
+      "disturbance": "测试草稿不丢失B",
+      "createdAt": "2026-06-20T16:54:58.980Z",
+      "updatedAt": "2026-06-20T16:54:58.980Z",
+      "history": [
+        {
+          "at": "2026-06-20T16:54:58.980Z",
+          "action": "创建",
+          "note": "自动判定：正常"
+        }
+      ],
+      "manuallyReviewed": false
+    },
+    {
+      "id": "surveys-1781974498984-da5a1",
+      "status": "正常",
+      "reviewNote": "",
+      "photos": [],
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 1.8000000000000007,
+      "deviationHumidity": 3,
+      "deviationCo2": 120,
+      "siteId": "site-seed-1",
+      "surveyor": "李巡测员A",
+      "date": "2026-06-20",
+      "temperature": 18,
+      "humidity": 95,
+      "co2": 800,
+      "dripRate": 10,
+      "disturbance": "测试草稿不丢失A",
+      "createdAt": "2026-06-20T16:54:58.984Z",
+      "updatedAt": "2026-06-20T16:54:58.984Z",
+      "history": [
+        {
+          "at": "2026-06-20T16:54:58.984Z",
+          "action": "创建",
+          "note": "自动判定：正常"
+        }
+      ],
+      "manuallyReviewed": false
     }
   ],
   "plans": [

@@ -1,7 +1,76 @@
 const state = {
   config: null,
   db: {},
-  activeTab: ''
+  activeTab: '',
+  selectedDraftIds: new Set(),
+  editingDraftId: null
+};
+
+const DRAFT_STORAGE_KEY = 'wxyy_survey_drafts_v1';
+
+const DraftStore = {
+  all() {
+    try {
+      const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      console.error('草稿读取失败', e);
+      return [];
+    }
+  },
+  save(list) {
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(list));
+  },
+  add(data) {
+    const list = this.all();
+    const now = new Date().toISOString();
+    const draft = {
+      id: `draft-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
+      collection: 'surveys',
+      data,
+      createdAt: now,
+      updatedAt: now,
+      submitError: null
+    };
+    list.unshift(draft);
+    this.save(list);
+    return draft;
+  },
+  update(id, data) {
+    const list = this.all();
+    const idx = list.findIndex((d) => d.id === id);
+    if (idx < 0) return null;
+    list[idx].data = { ...list[idx].data, ...data };
+    list[idx].updatedAt = new Date().toISOString();
+    list[idx].submitError = null;
+    this.save(list);
+    return list[idx];
+  },
+  remove(id) {
+    const list = this.all().filter((d) => d.id !== id);
+    this.save(list);
+  },
+  removeMany(ids) {
+    const set = new Set(ids);
+    const list = this.all().filter((d) => !set.has(d.id));
+    this.save(list);
+  },
+  setError(id, error) {
+    const list = this.all();
+    const idx = list.findIndex((d) => d.id === id);
+    if (idx >= 0) {
+      list[idx].submitError = error;
+      list[idx].updatedAt = new Date().toISOString();
+      this.save(list);
+    }
+  },
+  clearErrors() {
+    const list = this.all().map((d) => ({ ...d, submitError: null }));
+    this.save(list);
+  },
+  get(id) {
+    return this.all().find((d) => d.id === id) || null;
+  }
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -263,10 +332,21 @@ function values(form, view) {
 }
 
 function renderTabs() {
+  const draftCount = DraftStore.all().length;
+  const draftBadge = draftCount > 0 ? `<span class="tab-badge" data-tab-badge="drafts">${draftCount}</span>` : '';
   $('#tabs').innerHTML = state.config.views.map((view, index) => `
     <button class="tab${index === 0 ? ' active' : ''}" data-tab="${view.id}">${escapeHtml(view.label)}</button>
-  `).join('');
+  `).join('') + `<button class="tab tab-drafts" data-tab="drafts">草稿箱${draftBadge}</button>`;
   state.activeTab = state.config.views[0].id;
+}
+
+function updateDraftBadge() {
+  const count = DraftStore.all().length;
+  const badge = $('[data-tab-badge="drafts"]');
+  if (badge) {
+    badge.textContent = count;
+    badge.style.display = count > 0 ? '' : 'none';
+  }
 }
 
 function setTab(tabId) {
@@ -403,6 +483,157 @@ function renderHighRiskSummary() {
   </div>`;
 }
 
+function draftSiteLabel(siteId) {
+  const site = state.db.sites?.find((s) => s.id === siteId);
+  return site ? `${site.cave} / ${site.zone} / ${site.pointCode}` : (siteId || '未关联样点');
+}
+
+function draftTitle(draft) {
+  const d = draft.data;
+  const parts = [d.surveyor, d.date].filter(Boolean);
+  return parts.join(' / ') || draft.id;
+}
+
+function renderDraftCard(draft) {
+  const d = draft.data;
+  const selected = state.selectedDraftIds.has(draft.id);
+  const errorBox = draft.submitError
+    ? `<div class="draft-error"><strong>上次提交失败</strong><p>${escapeHtml(draft.submitError)}</p></div>`
+    : '';
+  const photoCount = Array.isArray(d.photos) ? d.photos.length : 0;
+  return `<article class="card draft-card${selected ? ' is-selected' : ''}${draft.submitError ? ' has-error' : ''}">
+    <div class="card-head">
+      <label class="draft-check"><input type="checkbox" data-draft-check="${draft.id}" ${selected ? 'checked' : ''}><span></span></label>
+      <h3>${escapeHtml(draftTitle(draft))}</h3>
+      <div class="card-head-right">
+        <span class="pill draft-pill">本地草稿</span>
+        ${photoCount > 0 ? `<span class="pill">📷 ${photoCount}张</span>` : ''}
+      </div>
+    </div>
+    <div class="meta">样点：${escapeHtml(draftSiteLabel(d.siteId))}</div>
+    <div class="detail">
+      <div>温度<br><strong>${escapeHtml(d.temperature ?? '-')}℃</strong></div>
+      <div>湿度<br><strong>${escapeHtml(d.humidity ?? '-')}%</strong></div>
+      <div>CO2<br><strong>${escapeHtml(d.co2 ?? '-')}ppm</strong></div>
+      <div>滴水频率<br><strong>${escapeHtml(d.dripRate ?? '-')}</strong></div>
+    </div>
+    ${d.disturbance ? `<p><strong>干扰痕迹：</strong>${escapeHtml(d.disturbance)}</p>` : ''}
+    <div class="meta draft-meta">创建：${fmtDate(draft.createdAt)} · 更新：${fmtDate(draft.updatedAt)}</div>
+    ${errorBox}
+    <div class="actions">
+      <button data-draft-edit="${draft.id}">继续编辑</button>
+      <button class="secondary" data-draft-submit="${draft.id}">提交入库</button>
+      <button class="danger" data-draft-delete="${draft.id}">删除草稿</button>
+    </div>
+  </article>`;
+}
+
+function renderDraftsView() {
+  const drafts = DraftStore.all();
+  const allSelected = drafts.length > 0 && drafts.every((d) => state.selectedDraftIds.has(d.id));
+  return `<section class="view" id="drafts">
+    <div class="panel drafts-toolbar-panel">
+      <h2>草稿箱 <span class="muted-text">（共 ${drafts.length} 条本地暂存记录，刷新页面不丢失）</span></h2>
+      <div class="drafts-toolbar">
+        <label class="check-all-label"><input type="checkbox" id="draftCheckAll" ${allSelected ? 'checked' : ''}><span>全选</span></label>
+        <div class="inline-actions">
+          <button id="draftSubmitSelected" ${state.selectedDraftIds.size === 0 ? 'disabled' : ''}>批量提交 (${state.selectedDraftIds.size})</button>
+          <button class="danger" id="draftDeleteSelected" ${state.selectedDraftIds.size === 0 ? 'disabled' : ''}>删除选中 (${state.selectedDraftIds.size})</button>
+          <button class="ghost" id="draftClearErrors">清除失败标记</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>本地草稿列表</h2>
+      <div class="list" id="draftList">
+        ${drafts.length
+          ? drafts.map(renderDraftCard).join('')
+          : '<div class="empty">暂无草稿 — 在「巡测记录」页填写表单后点击「保存草稿」可离线暂存</div>'}
+      </div>
+    </div>
+  </section>`;
+}
+
+function refreshDraftsView() {
+  const el = $('#drafts');
+  if (!el) return;
+  el.outerHTML = renderDraftsView();
+  updateDraftBadge();
+}
+
+function fillSurveyForm(draft) {
+  const view = state.config.views.find((v) => v.id === 'surveys');
+  if (!view) return;
+  const form = document.querySelector(`[data-create="surveys"]`);
+  if (!form) return;
+  const d = draft.data;
+  for (const field of view.fields) {
+    if (field.type === 'photos') {
+      const container = form.querySelector(`.photo-entries[data-field="${field.name}"]`);
+      if (container) {
+        container.innerHTML = '';
+        const photos = Array.isArray(d[field.name]) ? d[field.name] : [];
+        photos.forEach((photo, idx) => {
+          const div = document.createElement('div');
+          div.innerHTML = photoEntryHtml(field.name, photo).replace('照片 ' + field.name, `照片 ${idx + 1}`);
+          container.appendChild(div.firstElementChild);
+        });
+      }
+      continue;
+    }
+    if (field.type === 'multirelation') {
+      const sel = form.querySelector(`select[name="${field.name}"]`);
+      if (sel && Array.isArray(d[field.name])) {
+        for (const opt of sel.options) opt.selected = d[field.name].includes(opt.value);
+      }
+      continue;
+    }
+    const input = form.querySelector(`[name="${field.name}"]`);
+    if (!input) continue;
+    if (input.tagName === 'SELECT') {
+      input.value = d[field.name] ?? (field.options ? field.options[0] : '');
+    } else {
+      input.value = d[field.name] ?? (field.default ?? '');
+    }
+  }
+  state.editingDraftId = draft.id;
+  const submitBtn = form.querySelector('button[type="submit"]') || form.querySelector('button');
+  submitBtn.textContent = '更新草稿并提交入库';
+  let draftBtn = form.querySelector('[data-save-draft]');
+  if (draftBtn) draftBtn.textContent = '更新草稿';
+}
+
+async function submitOneDraft(draft) {
+  try {
+    await api(`/api/${draft.collection}`, { method: 'POST', body: JSON.stringify(draft.data) });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function submitDrafts(ids) {
+  const drafts = DraftStore.all().filter((d) => ids.includes(d.id));
+  if (!drafts.length) return { success: 0, fail: 0 };
+  const successIds = [];
+  const failed = [];
+  for (const draft of drafts) {
+    const result = await submitOneDraft(draft);
+    if (result.ok) {
+      successIds.push(draft.id);
+    } else {
+      DraftStore.setError(draft.id, result.error);
+      failed.push({ id: draft.id, title: draftTitle(draft), error: result.error });
+    }
+  }
+  if (successIds.length) {
+    DraftStore.removeMany(successIds);
+    successIds.forEach((id) => state.selectedDraftIds.delete(id));
+    await load();
+  }
+  return { success: successIds.length, fail: failed.length, failed };
+}
+
 function renderDashboardView(view) {
   const source = view.focus;
   let items = [...(state.db[source.collection] || [])];
@@ -438,15 +669,20 @@ function renderConfigView(view) {
 function renderCrudView(view) {
   const statusOptions = view.statusOptions || [];
   const filterOptions = view.filterField ? [...new Set((state.db[view.collection] || []).map((item) => item[view.filterField]).filter(Boolean))] : [];
+  const isSurveyView = view.collection === 'surveys';
+  const draftActions = isSurveyView
+    ? `<button type="button" class="ghost" data-save-draft>保存草稿（离线暂存）</button>`
+    : '';
+  const submitLabel = isSurveyView && state.editingDraftId ? '更新草稿并提交入库' : (view.submitLabel || '保存');
   return `<section class="view" id="${view.id}">
     <div class="grid">
       <form class="panel" data-create="${view.collection}" data-view="${view.id}">
-        <h2>${escapeHtml(view.formTitle)}</h2>
+        <h2>${escapeHtml(view.formTitle)}${isSurveyView && state.editingDraftId ? ' <span class="pill draft-pill">编辑草稿中</span>' : ''}</h2>
         <div class="form-grid">${view.fields.map(formField).join('')}</div>
-        <div class="actions"><button>${escapeHtml(view.submitLabel || '保存')}</button></div>
+        <div class="actions"><button>${escapeHtml(submitLabel)}</button>${draftActions}</div>
       </form>
       <div class="panel">
-        <h2>${escapeHtml(view.listTitle)}</h2>
+        <h2>${escapeHtml(view.listTitle)} <span class="muted-text">（已入库记录）</span></h2>
         <div class="toolbar">
           <input id="search-${view.id}" placeholder="${escapeHtml(view.searchPlaceholder || '搜索')}">
           <select id="status-${view.id}">
@@ -468,11 +704,12 @@ function render() {
   $('#title').textContent = state.config.title;
   document.title = state.config.title;
   $('#lede').textContent = state.config.lede;
-  $('#main').innerHTML = state.config.views.map((view) => {
+  const viewsHtml = state.config.views.map((view) => {
     if (view.type === 'dashboard') return renderDashboardView(view);
     if (view.type === 'config') return renderConfigView(view);
     return renderCrudView(view);
   }).join('');
+  $('#main').innerHTML = viewsHtml + renderDraftsView();
   setTab(state.activeTab || state.config.views[0].id);
 }
 
@@ -488,6 +725,14 @@ document.addEventListener('click', async (event) => {
   const removePhotoBtn = event.target.closest('.remove-photo-btn');
   const viewPhotosBtn = event.target.closest('[data-view-photos]');
   const closeModal = event.target.closest('[data-close-modal]');
+  const saveDraftBtn = event.target.closest('[data-save-draft]');
+  const draftEditBtn = event.target.closest('[data-draft-edit]');
+  const draftSubmitBtn = event.target.closest('[data-draft-submit]');
+  const draftDeleteBtn = event.target.closest('[data-draft-delete]');
+  const checkAll = event.target.closest('#draftCheckAll');
+  const submitSelBtn = event.target.closest('#draftSubmitSelected');
+  const deleteSelBtn = event.target.closest('#draftDeleteSelected');
+  const clearErrBtn = event.target.closest('#draftClearErrors');
   if (tab) setTab(tab.dataset.tab);
   if (action) {
     try {
@@ -513,6 +758,91 @@ document.addEventListener('click', async (event) => {
   if (closeModal) {
     closePhotoModal();
   }
+  if (saveDraftBtn) {
+    const form = saveDraftBtn.closest('[data-create]');
+    const view = state.config.views.find((entry) => entry.id === form.dataset.view);
+    const payload = values(form, view);
+    if (state.editingDraftId) {
+      DraftStore.update(state.editingDraftId, payload);
+      toast('草稿已更新');
+    } else {
+      DraftStore.add(payload);
+      toast('草稿已保存到本地');
+    }
+    state.selectedDraftIds.clear();
+    render();
+  }
+  if (draftEditBtn) {
+    const id = draftEditBtn.dataset.draftEdit;
+    const draft = DraftStore.get(id);
+    if (!draft) { toast('草稿不存在'); return; }
+    state.selectedDraftIds.clear();
+    setTab('surveys');
+    const viewEl = $('#surveys');
+    if (!viewEl || !viewEl.classList.contains('active')) render();
+    setTimeout(() => {
+      fillSurveyForm(draft);
+      toast('已载入草稿，可继续编辑');
+    }, 50);
+  }
+  if (draftSubmitBtn) {
+    const id = draftSubmitBtn.dataset.draftSubmit;
+    const draft = DraftStore.get(id);
+    if (!draft) { toast('草稿不存在'); return; }
+    draftSubmitBtn.disabled = true;
+    const result = await submitDrafts([id]);
+    refreshDraftsView();
+    if (result.fail > 0) {
+      toast(`提交失败：${result.failed[0].error}`);
+    } else {
+      toast('已提交入库');
+    }
+  }
+  if (draftDeleteBtn) {
+    const id = draftDeleteBtn.dataset.draftDelete;
+    if (!confirm('确定要删除该草稿吗？')) return;
+    DraftStore.remove(id);
+    state.selectedDraftIds.delete(id);
+    refreshDraftsView();
+    toast('已删除草稿');
+  }
+  if (checkAll) {
+    const drafts = DraftStore.all();
+    if (checkAll.checked) {
+      drafts.forEach((d) => state.selectedDraftIds.add(d.id));
+    } else {
+      state.selectedDraftIds.clear();
+    }
+    refreshDraftsView();
+  }
+  if (submitSelBtn) {
+    const ids = [...state.selectedDraftIds];
+    if (!ids.length) return;
+    submitSelBtn.disabled = true;
+    const result = await submitDrafts(ids);
+    refreshDraftsView();
+    if (result.fail === 0) {
+      toast(`全部提交成功（${result.success} 条）`);
+    } else if (result.success === 0) {
+      toast(`全部提交失败（${result.fail} 条），失败原因已标注`);
+    } else {
+      toast(`部分成功：${result.success} 条入库，${result.fail} 条失败（已保留）`);
+    }
+  }
+  if (deleteSelBtn) {
+    const ids = [...state.selectedDraftIds];
+    if (!ids.length) return;
+    if (!confirm(`确定要删除选中的 ${ids.length} 条草稿吗？`)) return;
+    DraftStore.removeMany(ids);
+    state.selectedDraftIds.clear();
+    refreshDraftsView();
+    toast('已删除选中草稿');
+  }
+  if (clearErrBtn) {
+    DraftStore.clearErrors();
+    refreshDraftsView();
+    toast('已清除失败标记');
+  }
 });
 
 document.addEventListener('input', (event) => {
@@ -523,6 +853,12 @@ document.addEventListener('input', (event) => {
 document.addEventListener('change', (event) => {
   const view = state.config.views.find((entry) => entry.id && (event.target.id === `status-${entry.id}` || event.target.id === `filter-${entry.id}`));
   if (view) $(`#list-${view.id}`).innerHTML = renderList(view);
+  const draftCheck = event.target.closest('[data-draft-check]');
+  if (draftCheck) {
+    const id = draftCheck.dataset.draftCheck;
+    if (draftCheck.checked) state.selectedDraftIds.add(id); else state.selectedDraftIds.delete(id);
+    refreshDraftsView();
+  }
 });
 
 document.addEventListener('submit', async (event) => {
@@ -532,13 +868,29 @@ document.addEventListener('submit', async (event) => {
   if (createForm) {
     event.preventDefault();
     const view = state.config.views.find((entry) => entry.id === createForm.dataset.view);
-    const result = await api(`/api/${createForm.dataset.create}`, { method: 'POST', body: JSON.stringify(values(createForm, view)) });
-    createForm.reset();
-    await load();
-    if (result && result.autoRiskLevel && result.autoRiskLevel !== '正常') {
-      toast(`自动判定：${result.autoRiskLevel} - ${(result.autoRiskReasons || []).join('；')}`);
-    } else {
-      toast('已保存');
+    const payload = values(createForm, view);
+    const editingId = state.editingDraftId;
+    try {
+      const result = await api(`/api/${createForm.dataset.create}`, { method: 'POST', body: JSON.stringify(payload) });
+      if (editingId) {
+        DraftStore.remove(editingId);
+        state.editingDraftId = null;
+      }
+      createForm.reset();
+      state.selectedDraftIds.clear();
+      await load();
+      if (result && result.autoRiskLevel && result.autoRiskLevel !== '正常') {
+        toast(`自动判定：${result.autoRiskLevel} - ${(result.autoRiskReasons || []).join('；')}`);
+      } else {
+        toast('已保存');
+      }
+    } catch (err) {
+      if (editingId) {
+        DraftStore.setError(editingId, err.message);
+        toast(`提交失败，已保存到草稿：${err.message}`);
+      } else {
+        toast(err.message);
+      }
     }
   }
   
