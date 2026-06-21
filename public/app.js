@@ -372,7 +372,8 @@ const AUDIT_ACTION_ICONS = {
   update: '✏️',
   delete: '🗑️',
   action: '🔄',
-  rollback: '↩️'
+  rollback: '↩️',
+  recalc_risk: '🔁'
 };
 
 const AUDIT_ACTION_LABELS = {
@@ -380,7 +381,8 @@ const AUDIT_ACTION_LABELS = {
   update: '更新',
   delete: '删除',
   action: '动作',
-  rollback: '回滚'
+  rollback: '回滚',
+  recalc_risk: '重新计算风险'
 };
 
 function formatValue(val) {
@@ -674,6 +676,172 @@ function autoRiskHtml(item) {
   </div>`;
 }
 
+function baselineImpactHint(site) {
+  const rules = state.config.thresholdRules || {};
+  const tr = rules.temperature || {};
+  const hr = rules.humidity || {};
+  const cr = rules.co2 || {};
+  const surveyCount = ((state.db.surveys || []).filter((s) => s.siteId === site.id)).length;
+  return `<div class="baseline-impact-hint">
+    <div class="baseline-impact-icon">⚠️</div>
+    <div class="baseline-impact-content">
+      <h4>基准值影响提示</h4>
+      <p>基准温度、湿度和 CO₂ 是自动风险判定的计算依据，修改后会影响该样点所有巡测记录的自动风险判定结果。</p>
+      <div class="baseline-impact-rules">
+        <span>温度偏差阈值：预警 ≥ ${tr.warning || 2}℃ / 高风险 ≥ ${tr.critical || 4}℃</span>
+        <span>湿度偏差阈值：预警 ≥ ${hr.warning || 10}% / 高风险 ≥ ${hr.critical || 20}%</span>
+        <span>CO₂ 偏差阈值：预警 ≥ ${cr.warning || 200}ppm / 高风险 ≥ ${cr.critical || 400}ppm</span>
+      </div>
+      ${surveyCount > 0 ? `<p class="baseline-impact-surveys">该样点已有 <strong>${surveyCount}</strong> 条巡测记录，保存后可对最近 10 条记录重新计算风险。</p>` : ''}
+    </div>
+  </div>`;
+}
+
+function openSiteEditModal(siteId) {
+  const site = state.db.sites?.find((s) => s.id === siteId);
+  if (!site) { toast('样点不存在'); return; }
+  const sitesView = state.config.views.find((v) => v.id === 'sites');
+  if (!sitesView) return;
+  const title = `${site.cave} / ${site.zone} / ${site.pointCode}`;
+  $('#siteEditModalTitle').textContent = `编辑样点 - ${title}`;
+
+  const fieldsHtml = sitesView.fields.map((field) => {
+    const value = site[field.name] ?? (field.default ?? '');
+    const required = field.required ? 'required' : '';
+    const baselineClass = ['baselineTemp', 'baselineHumidity', 'baselineCo2'].includes(field.name) ? 'baseline-field' : '';
+    if (field.type === 'textarea') {
+      return `<label class="${field.wide ? 'wide' : ''} ${baselineClass}">${field.label}<textarea name="${field.name}" ${required}>${escapeHtml(value)}</textarea></label>`;
+    }
+    if (field.type === 'select') {
+      return `<label class="${field.wide ? 'wide' : ''} ${baselineClass}">${field.label}<select name="${field.name}" ${required}>${field.options.map((opt) => `<option ${opt === value ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}</select></label>`;
+    }
+    return `<label class="${field.wide ? 'wide' : ''} ${baselineClass}">${field.label}<input type="${field.type || 'text'}" name="${field.name}" value="${escapeHtml(value)}" ${required}></label>`;
+  }).join('');
+
+  $('#siteEditModalBody').innerHTML = `
+    ${baselineImpactHint(site)}
+    <form id="siteEditForm" data-site-id="${site.id}">
+      <div class="form-grid">${fieldsHtml}</div>
+      <div class="actions">
+        <button type="submit">保存修改</button>
+        <button type="button" class="ghost" data-close-site-edit>取消</button>
+      </div>
+    </form>
+  `;
+  $('#siteEditModal').classList.add('show');
+}
+
+function closeSiteEditModal() {
+  $('#siteEditModal').classList.remove('show');
+}
+
+function openRiskRecalcModal(siteData) {
+  const site = state.db.sites?.find((s) => s.id === siteData.id) || siteData;
+  const changes = siteData.baselineChanges || {};
+  const changeLabels = {
+    baselineTemp: '基准温度',
+    baselineHumidity: '基准湿度',
+    baselineCo2: '基准CO₂'
+  };
+  const unitLabels = {
+    baselineTemp: '℃',
+    baselineHumidity: '%',
+    baselineCo2: 'ppm'
+  };
+  const changesHtml = Object.keys(changes).map((key) => {
+    const c = changes[key];
+    const unit = unitLabels[key] || '';
+    return `<div class="risk-recalc-change">
+      <span class="risk-recalc-field">${changeLabels[key] || key}</span>
+      <span class="risk-recalc-before">${Number(c.before).toFixed(key === 'baselineCo2' ? 0 : 1)}${unit}</span>
+      <span class="risk-recalc-arrow">→</span>
+      <span class="risk-recalc-after">${Number(c.after).toFixed(key === 'baselineCo2' ? 0 : 1)}${unit}</span>
+    </div>`;
+  }).join('');
+
+  const surveys = siteData.recentSurveys || [];
+  const surveysHtml = surveys.length ? `
+    <h4>受影响的最近 ${surveys.length} 条巡测记录</h4>
+    <div class="risk-recalc-surveys">
+      ${surveys.map((s) => `
+        <div class="risk-recalc-survey-item">
+          <div class="risk-recalc-survey-head">
+            <strong>${escapeHtml(s.surveyor || '-')} / ${escapeHtml(s.date || '-')}</strong>
+            ${s.autoRiskLevel && s.autoRiskLevel !== '正常' ? pill(s.autoRiskLevel, s.autoRiskLevel === '高风险' ? 'bad' : 'warn') : pill('正常', 'ok')}
+            ${s.status ? pill(s.status, toneFor(s.status)) : ''}
+          </div>
+          <div class="risk-recalc-survey-data">
+            <span>温度: <strong>${Number(s.temperature || 0).toFixed(1)}℃</strong></span>
+            <span>湿度: <strong>${Number(s.humidity || 0).toFixed(0)}%</strong></span>
+            <span>CO₂: <strong>${Number(s.co2 || 0).toFixed(0)}ppm</strong></span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  ` : '<p class="muted-text">该样点暂无巡测记录。</p>';
+
+  $('#riskRecalcModalTitle').textContent = `基准值已变更 - 重新计算风险`;
+  $('#riskRecalcModalBody').innerHTML = `
+    <div class="risk-recalc-panel">
+      <h3>变更内容</h3>
+      <div class="risk-recalc-changes">${changesHtml}</div>
+      ${surveys.length ? `
+        <div class="risk-recalc-actions">
+          <p>系统将使用新的基准值对上述 <strong>${surveys.length}</strong> 条巡测记录重新计算自动风险等级。已人工复核的记录其状态不会被自动覆盖。</p>
+          <button id="doRecalcRisksBtn" data-site-id="${siteData.id}">🔁 重新计算最近 ${surveys.length} 条记录风险</button>
+          <button class="ghost" data-close-risk-recalc>暂不处理</button>
+        </div>
+      ` : ''}
+      ${surveysHtml}
+      <div id="riskRecalcResult"></div>
+    </div>
+  `;
+  $('#riskRecalcModal').classList.add('show');
+}
+
+function closeRiskRecalcModal() {
+  $('#riskRecalcModal').classList.remove('show');
+}
+
+async function doRecalculateRisks(siteId) {
+  const btn = $('#doRecalcRisksBtn');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = '计算中...';
+  try {
+    const result = await api(`/api/sites/${siteId}/recalculate-risks`, { method: 'POST' });
+    await load();
+    const resultEl = $('#riskRecalcResult');
+    if (resultEl) {
+      const changed = result.results.filter((r) => r.oldRiskLevel !== r.newRiskLevel);
+      resultEl.innerHTML = `
+        <div class="risk-recalc-success">
+          <h4>✅ 重新计算完成</h4>
+          <p>共处理 <strong>${result.recalculatedCount}</strong> 条记录，其中 <strong>${changed.length}</strong> 条风险等级发生变化：</p>
+          ${changed.length ? `
+            <div class="risk-recalc-result-list">
+              ${changed.map((r) => `
+                <div class="risk-recalc-result-item">
+                  <span>${escapeHtml(r.id)}</span>
+                  <span>${pill(r.oldRiskLevel || '正常', r.oldRiskLevel === '高风险' ? 'bad' : (r.oldRiskLevel === '预警' ? 'warn' : 'ok'))}</span>
+                  <span>→</span>
+                  <span>${pill(r.newRiskLevel || '正常', r.newRiskLevel === '高风险' ? 'bad' : (r.newRiskLevel === '预警' ? 'warn' : 'ok'))}</span>
+                  <span class="muted-text">${pill(r.status, toneFor(r.status))}</span>
+                </div>
+              `).join('')}
+            </div>
+          ` : '<p class="muted-text">所有记录风险等级均未变化。</p>'}
+        </div>
+      `;
+    }
+    btn.remove();
+  } catch (err) {
+    toast(`重新计算失败：${err.message}`);
+    btn.disabled = false;
+    btn.textContent = '🔁 重新计算风险';
+  }
+}
+
 function renderCard(item, collection, view) {
   const title = view.titleFields.map((field) => item[field]).filter(Boolean).join(' / ') || item.id;
   const statusValue = item[view.statusField];
@@ -737,6 +905,12 @@ function renderCard(item, collection, view) {
       return `<button class="${action.danger ? 'danger' : 'ghost'}" data-action="${action.id}" data-id="${item.id}" ${permDisabled ? 'disabled title="无权限执行此操作"' : ''}>${escapeHtml(action.label)}</button>`;
     })
     .join('');
+
+  let editBtn = '';
+  if (collection === 'sites' && hasPermission('sites:update')) {
+    editBtn = `<button class="ghost" data-edit-site="${item.id}">✏️ 编辑样点</button>`;
+  }
+
   const canViewAudit = hasPermission('audit:view');
   const auditBtn = canViewAudit
     ? `<button class="ghost" data-audit-history="${collection}:${item.id}" data-audit-title="${escapeHtml(title)}">📋 审计历史</button>`
@@ -748,7 +922,7 @@ function renderCard(item, collection, view) {
     ${summary ? `<p>${escapeHtml(summary)}</p>` : ''}
     ${autoRiskHtml(item)}
     ${details ? `<div class="detail">${details}</div>` : ''}
-    <div class="actions">${actions}${auditBtn}</div>
+    <div class="actions">${editBtn}${actions}${auditBtn}</div>
     ${historyHtml(item)}
   </article>`;
 }
@@ -1069,6 +1243,7 @@ function renderCrudView(view) {
   const filterOptions = view.filterField ? [...new Set((state.db[view.collection] || []).map((item) => item[view.filterField]).filter(Boolean))] : [];
   const typeFilterOptions = view.typeFilterOptions || (view.typeFilterField ? [...new Set((state.db[view.collection] || []).map((item) => item[view.typeFilterField]).filter(Boolean))] : []);
   const isSurveyView = view.collection === 'surveys';
+  const isSitesView = view.collection === 'sites';
   const canCreate = canCreateCollection(view.collection);
   const draftActions = isSurveyView
     ? `<button type="button" class="ghost" data-save-draft ${!state.currentUser ? 'disabled title="请先登录"' : ''}>保存草稿（离线暂存）</button>`
@@ -1077,10 +1252,14 @@ function renderCrudView(view) {
   const hasExtraFilters = view.filterField || view.typeFilterField;
   const toolbarClass = hasExtraFilters ? 'toolbar toolbar-wide' : 'toolbar';
   const formDisabled = !canCreate;
+
+  const baselineHint = isSitesView && canCreate ? baselineImpactHint({ id: 'new' }) : '';
+
   return `<section class="view" id="${view.id}">
     <div class="grid">
       <form class="panel ${formDisabled ? 'form-disabled' : ''}" data-create="${view.collection}" data-view="${view.id}" ${formDisabled ? 'onsubmit="return false"' : ''}>
         <h2>${escapeHtml(view.formTitle)}${isSurveyView && state.editingDraftId ? ' <span class="pill draft-pill">编辑草稿中</span>' : ''}${formDisabled ? ' <span class="pill warn" title="无权限创建">无权限</span>' : ''}</h2>
+        ${baselineHint}
         <div class="form-grid">${view.fields.map(formField).join('')}</div>
         <div class="actions">
           <button type="submit" ${formDisabled ? 'disabled title="无权限创建此类型记录"' : ''}>${escapeHtml(submitLabel)}</button>
@@ -1606,6 +1785,8 @@ document.addEventListener('click', async (event) => {
   const closeModal = event.target.closest('[data-close-modal]');
   const closeAudit = event.target.closest('[data-close-audit]');
   const closeDiff = event.target.closest('[data-close-diff]');
+  const closeSiteEdit = event.target.closest('[data-close-site-edit]');
+  const closeRiskRecalc = event.target.closest('[data-close-risk-recalc]');
   const auditHistoryBtn = event.target.closest('[data-audit-history]');
   const viewDiffBtn = event.target.closest('[data-view-diff]');
   const rollbackBtn = event.target.closest('[data-rollback]');
@@ -1621,6 +1802,8 @@ document.addEventListener('click', async (event) => {
   const importPreviewBtn = event.target.closest('#importPreviewBtn');
   const importSubmitBtn = event.target.closest('#importSubmitBtn');
   const importClearBtn = event.target.closest('#importClearBtn');
+  const editSiteBtn = event.target.closest('[data-edit-site]');
+  const doRecalcBtn = event.target.closest('#doRecalcRisksBtn');
   if (tab) setTab(tab.dataset.tab);
   if (zoneCard && !event.target.closest('.zone-detail') && !event.target.closest('.zone-detail-loading')) {
     event.preventDefault();
@@ -1661,6 +1844,20 @@ document.addEventListener('click', async (event) => {
   }
   if (closeDiff) {
     closeDiffModal();
+  }
+  if (closeSiteEdit) {
+    closeSiteEditModal();
+  }
+  if (closeRiskRecalc) {
+    closeRiskRecalcModal();
+  }
+  if (editSiteBtn) {
+    openSiteEditModal(editSiteBtn.dataset.editSite);
+    return;
+  }
+  if (doRecalcBtn) {
+    await doRecalculateRisks(doRecalcBtn.dataset.siteId);
+    return;
   }
   if (auditHistoryBtn) {
     const [collection, id] = auditHistoryBtn.dataset.auditHistory.split(':');
@@ -1792,6 +1989,7 @@ document.addEventListener('change', (event) => {
 document.addEventListener('submit', async (event) => {
   const createForm = event.target.closest('[data-create]');
   const configForm = event.target.closest('[data-config-thresholds]');
+  const siteEditForm = event.target.closest('#siteEditForm');
   
   if (createForm) {
     event.preventDefault();
@@ -1838,6 +2036,37 @@ document.addEventListener('submit', async (event) => {
       toast(error.message);
     }
   }
+
+  if (siteEditForm) {
+    event.preventDefault();
+    const siteId = siteEditForm.dataset.siteId;
+    const formData = new FormData(siteEditForm);
+    const payload = {};
+    for (const [key, value] of formData.entries()) {
+      payload[key] = value;
+    }
+    const sitesView = state.config.views.find((v) => v.id === 'sites');
+    if (sitesView) {
+      for (const field of sitesView.fields) {
+        if (field.type === 'number' && payload[field.name] !== undefined) {
+          payload[field.name] = Number(payload[field.name]);
+        }
+      }
+    }
+    try {
+      const result = await api(`/api/sites/${siteId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+      await load();
+      closeSiteEditModal();
+      if (result && result.baselineChanged) {
+        toast('样点已保存，基准值已变更');
+        openRiskRecalcModal(result);
+      } else {
+        toast('样点已保存');
+      }
+    } catch (err) {
+      toast(err.message);
+    }
+  }
 });
 
 $('#refreshBtn').addEventListener('click', () => load().then(() => toast('已刷新')));
@@ -1870,6 +2099,8 @@ document.addEventListener('keydown', async (event) => {
     closeAuditModal();
     closeDiffModal();
     closeLoginModal();
+    closeSiteEditModal();
+    closeRiskRecalcModal();
   }
   const zoneCard = event.target.closest('.zone-card');
   if (zoneCard && (event.key === 'Enter' || event.key === ' ')) {

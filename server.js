@@ -269,6 +269,21 @@ app.patch('/api/:collection/:id', authMiddleware, async (req, res) => {
   const thresholdRules = getThresholdRules(db);
   const oldStatus = item.status;
 
+  const baselineFields = ['baselineTemp', 'baselineHumidity', 'baselineCo2'];
+  let baselineChanged = false;
+  let baselineChanges = {};
+  if (collection === 'sites') {
+    for (const field of baselineFields) {
+      if (req.body[field] !== undefined && Number(req.body[field]) !== Number(item[field])) {
+        baselineChanged = true;
+        baselineChanges[field] = {
+          before: Number(item[field]),
+          after: Number(req.body[field])
+        };
+      }
+    }
+  }
+
   if (collection === 'surveys' && req.body.status !== undefined && req.body.status !== oldStatus) {
     const newStatus = req.body.status;
     if (newStatus === '已复查') {
@@ -304,8 +319,11 @@ app.patch('/api/:collection/:id', authMiddleware, async (req, res) => {
   }
   item.history = item.history || [];
   const historyNote = req.body.note || req.body.memo || '';
-  if (historyAction || historyNote || req.body.status) {
-    item.history.unshift(stamp(historyAction || req.body.status || '更新', historyNote));
+  if (historyAction || historyNote || req.body.status || baselineChanged) {
+    const finalNote = baselineChanged
+      ? `${historyNote ? historyNote + '；' : ''}基准值变更（${Object.keys(baselineChanges).join('、')}）`
+      : historyNote;
+    item.history.unshift(stamp(historyAction || req.body.status || '更新', finalNote));
   }
   audit.createAuditLog({
     db,
@@ -319,7 +337,30 @@ app.patch('/api/:collection/:id', authMiddleware, async (req, res) => {
     operator
   });
   await writeDb(db);
-  res.json(item);
+
+  if (collection === 'sites' && baselineChanged) {
+    const siteSurveys = (db.surveys || [])
+      .filter((s) => s.siteId === id)
+      .sort(sortNewest)
+      .slice(0, 10);
+    const responseItem = JSON.parse(JSON.stringify(item));
+    responseItem.baselineChanged = true;
+    responseItem.baselineChanges = baselineChanges;
+    responseItem.affectedSurveyCount = siteSurveys.length;
+    responseItem.recentSurveys = siteSurveys.map((s) => ({
+      id: s.id,
+      date: s.date,
+      surveyor: s.surveyor,
+      temperature: s.temperature,
+      humidity: s.humidity,
+      co2: s.co2,
+      autoRiskLevel: s.autoRiskLevel,
+      status: s.status
+    }));
+    res.json(responseItem);
+  } else {
+    res.json(item);
+  }
 });
 
 app.delete('/api/:collection/:id', authMiddleware, async (req, res) => {
@@ -903,6 +944,90 @@ app.post('/api/audit-logs/:logId/rollback', authMiddleware, requirePermission('a
     item: result.item,
     auditLog: result.auditLog,
     sourceLog: result.sourceLog
+  });
+});
+
+app.post('/api/sites/:siteId/recalculate-risks', authMiddleware, requirePermission('sites:update'), async (req, res) => {
+  const { siteId } = req.params;
+  const db = req.db;
+  const site = db.sites?.find((s) => s.id === siteId);
+  if (!site) return res.status(404).json({ error: '样点不存在' });
+
+  const operator = req.user ? req.user.name : (req.body?.operator || req.headers['x-operator'] || 'system');
+  const thresholdRules = getThresholdRules(db);
+
+  const siteSurveys = (db.surveys || [])
+    .filter((s) => s.siteId === siteId)
+    .sort(sortNewest)
+    .slice(0, 10);
+
+  const recalculated = [];
+  for (const survey of siteSurveys) {
+    const beforeUpdate = JSON.parse(JSON.stringify(survey));
+    const oldRiskLevel = survey.autoRiskLevel;
+    const risk = computeAutoRisk(survey, site, thresholdRules);
+    survey.autoRiskLevel = risk.autoRiskLevel;
+    survey.autoRiskReasons = risk.autoRiskReasons;
+    survey.deviationTemp = risk.deviationTemp;
+    survey.deviationHumidity = risk.deviationHumidity;
+    survey.deviationCo2 = risk.deviationCo2;
+    survey.updatedAt = new Date().toISOString();
+
+    if (!survey.manuallyReviewed) {
+      if (risk.autoRiskLevel === '高风险' && survey.status === '正常') {
+        survey.status = '异常待复查';
+      } else if (risk.autoRiskLevel === '正常' && survey.status === '异常待复查' && oldRiskLevel && oldRiskLevel !== '正常') {
+        survey.status = '正常';
+      }
+    }
+
+    survey.history = survey.history || [];
+    const riskNote = oldRiskLevel !== risk.autoRiskLevel
+      ? `基准值变更导致风险重算：${oldRiskLevel || '正常'} → ${risk.autoRiskLevel}`
+      : `基准值变更导致风险重算：风险等级未变（${risk.autoRiskLevel || '正常'}）`;
+    survey.history.unshift(stamp('重新计算风险', riskNote));
+
+    audit.createAuditLog({
+      db,
+      collection: 'surveys',
+      recordId: survey.id,
+      action: audit.AUDIT_TYPES.RECALC_RISK,
+      actionLabel: '重新计算风险',
+      before: beforeUpdate,
+      after: survey,
+      note: riskNote,
+      operator
+    });
+
+    recalculated.push({
+      id: survey.id,
+      oldRiskLevel,
+      newRiskLevel: risk.autoRiskLevel,
+      status: survey.status,
+      reasons: risk.autoRiskReasons,
+      deviationTemp: risk.deviationTemp,
+      deviationHumidity: risk.deviationHumidity,
+      deviationCo2: risk.deviationCo2
+    });
+  }
+
+  audit.createAuditLog({
+    db,
+    collection: 'sites',
+    recordId: siteId,
+    action: audit.AUDIT_TYPES.RECALC_RISK,
+    actionLabel: '批量重算风险',
+    before: null,
+    after: { recalculatedCount: recalculated.length },
+    note: `对该样点最近 ${recalculated.length} 条巡测记录重新计算风险`,
+    operator
+  });
+
+  await writeDb(db);
+  res.json({
+    siteId,
+    recalculatedCount: recalculated.length,
+    results: recalculated
   });
 });
 

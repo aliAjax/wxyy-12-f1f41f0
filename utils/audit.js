@@ -5,7 +5,8 @@ const AUDIT_TYPES = {
   UPDATE: 'update',
   DELETE: 'delete',
   ACTION: 'action',
-  ROLLBACK: 'rollback'
+  ROLLBACK: 'rollback',
+  RECALC_RISK: 'recalc_risk'
 };
 
 function deepClone(obj) {

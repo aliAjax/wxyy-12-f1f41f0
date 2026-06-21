@@ -2256,3 +2256,250 @@ button[disabled] {
 .draft-card.has-plan-source::before {
   content: '计划生成';
 }
+
+.baseline-impact-hint {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(163, 92, 0, .08), rgba(17, 97, 92, .05));
+  border: 1px solid rgba(163, 92, 0, .3);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.baseline-impact-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.baseline-impact-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.baseline-impact-content h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: var(--warn);
+  font-weight: 800;
+}
+
+.baseline-impact-content p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.baseline-impact-rules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+}
+
+.baseline-impact-rules span {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.baseline-impact-surveys {
+  font-size: 13px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.baseline-impact-surveys strong {
+  color: var(--warn);
+}
+
+#siteEditForm .form-grid label.baseline-field {
+  position: relative;
+}
+
+#siteEditForm .form-grid label.baseline-field::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  background: var(--warn);
+  border-radius: 2px;
+}
+
+.risk-recalc-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.risk-recalc-panel h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.risk-recalc-panel h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.risk-recalc-changes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.risk-recalc-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.risk-recalc-field {
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.risk-recalc-before {
+  background: rgba(161, 61, 61, .1);
+  color: var(--bad);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  text-decoration: line-through;
+  font-size: 13px;
+}
+
+.risk-recalc-arrow {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.risk-recalc-after {
+  background: rgba(38, 115, 77, .1);
+  color: var(--ok);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.risk-recalc-actions {
+  background: linear-gradient(135deg, rgba(17, 97, 92, .05), rgba(38, 115, 77, .04));
+  border: 1px solid rgba(17, 97, 92, .25);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.risk-recalc-actions p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.risk-recalc-actions p strong {
+  color: var(--accent);
+}
+
+.risk-recalc-surveys {
+  display: grid;
+  gap: 8px;
+}
+
+.risk-recalc-survey-item {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.risk-recalc-survey-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.risk-recalc-survey-data {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.risk-recalc-survey-data strong {
+  color: var(--ink);
+}
+
+.risk-recalc-success {
+  background: linear-gradient(135deg, rgba(38, 115, 77, .08), rgba(17, 97, 92, .04));
+  border: 1px solid rgba(38, 115, 77, .35);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.risk-recalc-success h4 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: var(--ok);
+  font-weight: 800;
+}
+
+.risk-recalc-success p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.risk-recalc-result-list {
+  display: grid;
+  gap: 6px;
+}
+
+.risk-recalc-result-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 620px) {
+  .baseline-impact-hint {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .baseline-impact-icon {
+    font-size: 20px;
+  }
+
+  .risk-recalc-change,
+  .risk-recalc-result-item {
+    width: 100%;
+  }
+
+  .risk-recalc-survey-data {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+}
