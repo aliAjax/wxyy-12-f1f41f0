@@ -203,6 +203,8 @@ app.post('/api/:collection', authMiddleware, async (req, res) => {
   const operator = req.user ? req.user.name : (req.body.operator || req.headers['x-operator'] || 'system');
   const now = new Date().toISOString();
   const thresholdRules = getThresholdRules(db);
+  const autoCreateReview = collection === 'incidents' && req.body.autoCreateReview === true;
+  delete req.body.autoCreateReview;
   const item = {
     id: `${collection}-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
     ...req.body,
@@ -225,6 +227,48 @@ app.post('/api/:collection', authMiddleware, async (req, res) => {
     const riskNote = risk.autoRiskLevel !== '正常' ? `自动判定：${risk.autoRiskLevel}（${risk.autoRiskReasons.join('；')}）` : '自动判定：正常';
     item.history[0] = stamp('创建', `${req.body.note || req.body.memo || ''}${req.body.note || req.body.memo ? '；' : ''}${riskNote}`);
   }
+
+  let linkedReview = null;
+  if (collection === 'incidents' && autoCreateReview && ['严重', '紧急'].includes(item.severity)) {
+    if (!db.reviews) db.reviews = [];
+    let targetSurveyId = item.surveyId || '';
+    if (!targetSurveyId) {
+      const siteSurveys = (db.surveys || [])
+        .filter((survey) => survey.siteId === item.siteId)
+        .sort(sortNewest);
+      targetSurveyId = siteSurveys[0]?.id || '';
+    }
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 3);
+    linkedReview = {
+      id: `reviews-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
+      surveyId: targetSurveyId,
+      siteId: item.siteId,
+      incidentId: item.id,
+      assignee: operator,
+      dueDate: dueDate.toISOString().slice(0, 10),
+      status: '待处理',
+      suggestion: `因${item.severity}干扰事件「${item.eventType}」自动创建的联动复查任务，请核实事件影响并完成复查。`,
+      autoCreatedFromIncident: true,
+      createdAt: now,
+      updatedAt: now,
+      history: [stamp('创建', `由干扰事件 ${item.id} 自动联动创建`)]
+    };
+    item.linkedReviewId = linkedReview.id;
+    item.history.unshift(stamp('联动复查', `已自动创建复查任务 ${linkedReview.id}`));
+    audit.createAuditLog({
+      db,
+      collection: 'reviews',
+      recordId: linkedReview.id,
+      action: audit.AUDIT_TYPES.CREATE,
+      actionLabel: '创建（联动）',
+      before: null,
+      after: linkedReview,
+      note: `由干扰事件 ${item.id} 自动创建`,
+      operator
+    });
+    db.reviews.push(linkedReview);
+  }
   audit.createAuditLog({
     db,
     collection,
@@ -233,12 +277,14 @@ app.post('/api/:collection', authMiddleware, async (req, res) => {
     actionLabel: '创建',
     before: null,
     after: item,
-    note: req.body.note || req.body.memo || '',
+    note: req.body.note || req.body.memo || (linkedReview ? `自动创建联动复查任务 ${linkedReview.id}` : ''),
     operator
   });
   db[collection].push(item);
   await writeDb(db);
-  res.status(201).json(item);
+  const response = { ...item };
+  if (linkedReview) response.linkedReview = linkedReview;
+  res.status(201).json(response);
 });
 
 app.patch('/api/:collection/:id', authMiddleware, async (req, res) => {
@@ -505,6 +551,73 @@ function runAction(db, action, item, operator, note) {
     setValue(target, delta.field, current + amount);
     stampOnce(target, action.note || '数量调整');
   }
+
+  const isIncidentComplete = action.collection === 'incidents' &&
+    (action.id === 'incident-resolve' || action.id === 'incident-close');
+  const linkHints = { review: null, site: null };
+  if (isIncidentComplete) {
+    const completedLabel = action.id === 'incident-resolve' ? '处理完成' : '关闭';
+    if (item.linkedReviewId) {
+      const linkedReview = (db.reviews || []).find((review) => review.id === item.linkedReviewId);
+      if (linkedReview) {
+        const beforeReview = JSON.parse(JSON.stringify(linkedReview));
+        const alreadyComplete = linkedReview.status === '已完成';
+        linkedReview.incidentResolvedHint = alreadyComplete
+          ? `关联干扰事件已${completedLabel}，该复查任务已人工完成，原复查结果保持不变`
+          : `关联干扰事件已${completedLabel}，请核实是否还需继续复查`;
+        linkedReview.updatedAt = new Date().toISOString();
+        linkedReview.history = linkedReview.history || [];
+        linkedReview.history.unshift(stamp('事件联动提示', `关联事件 ${item.id} 已${completedLabel}${alreadyComplete ? '，人工复查结果保持不变' : '，请评估复查必要性'}`));
+        linkHints.review = linkedReview.id;
+        audit.createAuditLog({
+          db,
+          collection: 'reviews',
+          recordId: linkedReview.id,
+          action: audit.AUDIT_TYPES.ACTION,
+          actionLabel: '事件联动提示',
+          before: beforeReview,
+          after: linkedReview,
+          note: `关联干扰事件 ${item.id} 已${completedLabel}，已生成复查提示（未覆盖人工结果）`,
+          operator
+        });
+      }
+    }
+    if (item.siteId) {
+      const site = (db.sites || []).find((entry) => entry.id === item.siteId);
+      if (site) {
+        const beforeSite = JSON.parse(JSON.stringify(site));
+        const previousStatus = site.protectedStatus;
+        const hintMsg = `关联${item.severity}干扰事件「${item.eventType}」已${completedLabel}，请评估是否调整保护状态（当前：${previousStatus}）`;
+        site.protectionHints = site.protectionHints || [];
+        site.protectionHints.unshift({
+          incidentId: item.id,
+          hint: hintMsg,
+          severity: item.severity,
+          at: new Date().toISOString(),
+          actionId: action.id
+        });
+        site.updatedAt = new Date().toISOString();
+        site.history = site.history || [];
+        site.history.unshift(stamp('事件联动提示', hintMsg));
+        linkHints.site = site.id;
+        audit.createAuditLog({
+          db,
+          collection: 'sites',
+          recordId: site.id,
+          action: audit.AUDIT_TYPES.ACTION,
+          actionLabel: '事件联动提示',
+          before: beforeSite,
+          after: site,
+          note: `${hintMsg}（仅作提示，未自动修改保护状态）`,
+          operator
+        });
+      }
+    }
+    if (linkHints.review || linkHints.site) {
+      item.linkHints = linkHints;
+    }
+  }
+
   if (stamped.has(item) && beforeItem) {
     audit.createAuditLog({
       db,

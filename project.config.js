@@ -276,18 +276,19 @@ module.exports = {
       formTitle: '新建复查任务',
       listTitle: '复查任务列表',
       submitLabel: '保存任务',
-      searchPlaceholder: '搜索负责人、处理建议',
-      searchFields: ['assignee', 'suggestion'],
+      searchPlaceholder: '搜索负责人、处理建议、关联事件',
+      searchFields: ['assignee', 'suggestion', 'incidentId'],
       statusField: 'status',
       statusOptions: ['待处理', '已完成'],
       titleFields: ['assignee', 'dueDate'],
       relation: { collection: 'surveys', localKey: 'surveyId', labelFields: ['surveyor', 'date'], withSite: true },
-      summaryFields: ['suggestion'],
+      summaryFields: ['suggestion', 'incidentResolvedHint'],
       detailFields: [
         { label: '截止日期', name: 'dueDate' },
-        { label: '复查负责人', name: 'assignee' }
+        { label: '复查负责人', name: 'assignee' },
+        { label: '关联事件', name: 'incidentId' }
       ],
-      defaults: { status: '待处理', suggestion: '' },
+      defaults: { status: '待处理', suggestion: '', incidentId: '', autoCreatedFromIncident: false },
       fields: [
         { label: '异常巡测记录', name: 'surveyId', type: 'relation', collection: 'surveys', labelFields: ['surveyor', 'date'], filter: { field: 'status', value: '异常待复查' }, withSite: true, required: true, wide: true },
         { label: '复查负责人', name: 'assignee', required: true },
@@ -304,7 +305,7 @@ module.exports = {
       listTitle: '事件历史',
       submitLabel: '保存事件',
       searchPlaceholder: '搜索事件描述、上报人、处理说明',
-      searchFields: ['description', 'reporter', 'handlingNote', 'photos.title', 'photos.description'],
+      searchFields: ['description', 'reporter', 'handlingNote', 'photos.title', 'photos.description', 'linkedReviewId'],
       statusField: 'status',
       statusOptions: ['待处理', '处理中', '已处理', '已关闭'],
       filterField: 'severity',
@@ -319,9 +320,10 @@ module.exports = {
         { label: '严重程度', name: 'severity' },
         { label: '事件类型', name: 'eventType' },
         { label: '上报人', name: 'reporter' },
-        { label: '发生时间', name: 'occurredAt' }
+        { label: '发生时间', name: 'occurredAt' },
+        { label: '关联复查任务', name: 'linkedReviewId' }
       ],
-      defaults: { status: '待处理', severity: '一般', photos: [], handlingNote: '', surveyId: '' },
+      defaults: { status: '待处理', severity: '一般', photos: [], handlingNote: '', surveyId: '', autoCreateReview: false },
       fields: [
         { label: '关联样点', name: 'siteId', type: 'relation', collection: 'sites', labelFields: ['cave', 'zone', 'pointCode'], required: true, wide: true },
         { label: '关联巡测记录', name: 'surveyId', type: 'relation', collection: 'surveys', labelFields: ['surveyor', 'date'], withSite: true, wide: true },
@@ -332,7 +334,8 @@ module.exports = {
         { label: '事件描述', name: 'description', type: 'textarea', required: true, wide: true },
         { label: '照片证据', name: 'photos', type: 'photos', wide: true },
         { label: '处理状态', name: 'status', type: 'select', options: ['待处理', '处理中', '已处理', '已关闭'] },
-        { label: '处理说明', name: 'handlingNote', type: 'textarea', wide: true }
+        { label: '处理说明', name: 'handlingNote', type: 'textarea', wide: true },
+        { label: '自动创建联动复查任务', name: 'autoCreateReview', type: 'checkbox', hint: '严重或紧急事件登记时可选择自动创建复查任务，关联对应巡测记录或样点' }
       ]
     }
   ],

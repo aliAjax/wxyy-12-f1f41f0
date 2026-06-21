@@ -291,6 +291,10 @@ function formField(field) {
       <div class="photo-entries" data-field="${field.name}"></div>
     </div>`;
   }
+  if (field.type === 'checkbox') {
+    const hintHtml = field.hint ? `<div class="field-hint">${escapeHtml(field.hint)}</div>` : '';
+    return `<label class="checkbox-field ${field.wide ? 'wide' : ''}"><input type="checkbox" name="${field.name}"> <span class="checkbox-label">${field.label}</span>${hintHtml}</label>`;
+  }
   return `<label class="${field.wide ? 'wide' : ''}">${field.label}<input type="${field.type || 'text'}" name="${field.name}" ${value} ${required}></label>`;
 }
 
@@ -300,6 +304,78 @@ function pill(value, tone = '') {
 
 function toneFor(value) {
   return state.config.tones?.[value] || '';
+}
+
+function incidentLinkInfoHtml(item, collection) {
+  if (collection === 'incidents' && item.linkedReviewId) {
+    const review = state.db.reviews?.find((entry) => entry.id === item.linkedReviewId);
+    const reviewStatus = review ? review.status : '未知';
+    const reviewLabel = review ? `${review.assignee || '未分配'} / ${review.dueDate || '无截止日期'}` : '任务不存在';
+    return `<div class="link-info">
+      <span class="link-info-icon">🔗</span>
+      <div class="link-info-content">
+        <div class="link-info-title">已联动复查任务</div>
+        <div class="link-info-detail">${escapeHtml(item.linkedReviewId)} · ${escapeHtml(reviewLabel)} ${pill(reviewStatus, toneFor(reviewStatus))}</div>
+      </div>
+    </div>`;
+  }
+  if (collection === 'reviews' && item.incidentId) {
+    const incident = state.db.incidents?.find((entry) => entry.id === item.incidentId);
+    const incidentStatus = incident ? incident.status : '未知';
+    const incidentLabel = incident ? `${incident.eventType || ''} · ${incident.reporter || ''}` : '事件不存在';
+    const autoBadge = item.autoCreatedFromIncident ? '<span class="pill warn" title="由系统自动联动创建">自动创建</span>' : '';
+    return `<div class="link-info">
+      <span class="link-info-icon">🔗</span>
+      <div class="link-info-content">
+        <div class="link-info-title">关联干扰事件 ${autoBadge}</div>
+        <div class="link-info-detail">${escapeHtml(item.incidentId)} · ${escapeHtml(incidentLabel)} ${pill(incidentStatus, toneFor(incidentStatus))}</div>
+      </div>
+    </div>`;
+  }
+  return '';
+}
+
+function incidentHintHtml(item, collection) {
+  const hints = [];
+  if (collection === 'reviews' && item.incidentResolvedHint) {
+    const completed = item.status === '已完成';
+    hints.push(`<div class="link-hint ${completed ? 'ok' : 'warn'}">
+      <span class="link-hint-icon">💡</span>
+      <div class="link-hint-content">
+        <div class="link-hint-title">事件联动提示</div>
+        <div class="link-hint-detail">${escapeHtml(item.incidentResolvedHint)}</div>
+        <div class="link-hint-note">（仅作提示，未覆盖人工复查结果）</div>
+      </div>
+    </div>`);
+  }
+  if (collection === 'sites' && Array.isArray(item.protectionHints) && item.protectionHints.length > 0) {
+    const latestHint = item.protectionHints[0];
+    const toneClass = latestHint.severity === '紧急' ? 'bad' : (latestHint.severity === '严重' ? 'warn' : 'ok');
+    hints.push(`<div class="link-hint ${toneClass}">
+      <span class="link-hint-icon">💡</span>
+      <div class="link-hint-content">
+        <div class="link-hint-title">事件联动提示 · ${pill(latestHint.severity, toneClass)}</div>
+        <div class="link-hint-detail">${escapeHtml(latestHint.hint)}</div>
+        <div class="link-hint-note">（仅作提示，保护状态仍保留为 ${escapeHtml(item.protectedStatus)}）</div>
+      </div>
+    </div>`);
+  }
+  if (collection === 'incidents' && item.linkHints) {
+    const hintParts = [];
+    if (item.linkHints.review) hintParts.push(`复查任务 ${escapeHtml(item.linkHints.review)} 已生成联动提示`);
+    if (item.linkHints.site) hintParts.push(`样点 ${escapeHtml(item.linkHints.site)} 已生成联动提示`);
+    if (hintParts.length) {
+      hints.push(`<div class="link-hint ok">
+        <span class="link-hint-icon">✅</span>
+        <div class="link-hint-content">
+          <div class="link-hint-title">联动提示已发送</div>
+          <div class="link-hint-detail">${hintParts.join('；')}</div>
+          <div class="link-hint-note">（仅发送提示，未自动覆盖人工结果）</div>
+        </div>
+      </div>`);
+    }
+  }
+  return hints.join('');
 }
 
 function historyHtml(item) {
@@ -608,6 +684,10 @@ function values(form, view) {
   }
   for (const field of view.fields) {
     if (field.type === 'number') payload[field.name] = Number(payload[field.name] || 0);
+    if (field.type === 'checkbox') {
+      const checkbox = form.querySelector(`input[type="checkbox"][name="${field.name}"]`);
+      payload[field.name] = checkbox ? checkbox.checked : false;
+    }
     if (field.type === 'multirelation') {
       if (!Array.isArray(payload[field.name])) {
         payload[field.name] = payload[field.name] ? [payload[field.name]] : [];
@@ -924,6 +1004,8 @@ function renderCard(item, collection, view) {
     ${siteListHtml}
     ${summary ? `<p>${escapeHtml(summary)}</p>` : ''}
     ${autoRiskHtml(item)}
+    ${incidentLinkInfoHtml(item, collection)}
+    ${incidentHintHtml(item, collection)}
     ${details ? `<div class="detail">${details}</div>` : ''}
     <div class="actions">${editBtn}${actions}${auditBtn}</div>
     ${historyHtml(item)}
