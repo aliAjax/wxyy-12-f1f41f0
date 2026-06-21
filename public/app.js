@@ -932,23 +932,13 @@ function renderList(view) {
   const collection = view.collection;
   const isSurveyView = collection === 'surveys';
   const viewFilters = state.listFilters[view.id] || {};
-  const query = ($(`#search-${view.id}`)?.value?.trim()) || viewFilters.search || '';
-  const status = ($(`#status-${view.id}`)?.value) || viewFilters.status || '';
-  const filterValue = view.filterField ? (($(`#filter-${view.id}`)?.value) || (viewFilters[view.filterField] || '')) : '';
-  const typeFilterValue = view.typeFilterField ? (($(`#typeFilter-${view.id}`)?.value) || (viewFilters[view.typeFilterField] || '')) : '';
-  const autoRiskValue = isSurveyView ? (($(`#autoRisk-${view.id}`)?.value) || viewFilters.autoRiskLevel || '') : '';
+  const query = viewFilters.search || '';
+  const status = viewFilters.status || '';
+  const filterValue = view.filterField ? (viewFilters[view.filterField] || '') : '';
+  const typeFilterValue = view.typeFilterField ? (viewFilters[view.typeFilterField] || '') : '';
+  const autoRiskValue = isSurveyView ? (viewFilters.autoRiskLevel || '') : '';
   const importedIdsStr = isSurveyView ? (viewFilters.importedIds || '') : '';
   const importedIds = importedIdsStr ? importedIdsStr.split(',').filter(Boolean) : [];
-
-  state.listFilters[view.id] = {
-    ...viewFilters,
-    search: query,
-    status,
-    ...(view.filterField ? { [view.filterField]: filterValue } : {}),
-    ...(view.typeFilterField ? { [view.typeFilterField]: typeFilterValue } : {}),
-    ...(isSurveyView ? { autoRiskLevel: autoRiskValue } : {}),
-    ...(isSurveyView && importedIdsStr ? { importedIds: importedIdsStr } : {})
-  };
 
   let items = [...(state.db[collection] || [])];
   if (query) {
@@ -2100,14 +2090,40 @@ document.addEventListener('click', async (event) => {
   }
 });
 
+function syncFilterFromDom(view) {
+  if (!view || !view.id) return;
+  state.listFilters[view.id] = state.listFilters[view.id] || {};
+  const filters = state.listFilters[view.id];
+  const searchEl = $(`#search-${view.id}`);
+  if (searchEl) filters.search = searchEl.value.trim();
+  const statusEl = $(`#status-${view.id}`);
+  if (statusEl) filters.status = statusEl.value || '';
+  if (view.filterField) {
+    const filterEl = $(`#filter-${view.id}`);
+    if (filterEl) filters[view.filterField] = filterEl.value || '';
+  }
+  if (view.typeFilterField) {
+    const typeFilterEl = $(`#typeFilter-${view.id}`);
+    if (typeFilterEl) filters[view.typeFilterField] = typeFilterEl.value || '';
+  }
+  if (view.collection === 'surveys') {
+    const autoRiskEl = $(`#autoRisk-${view.id}`);
+    if (autoRiskEl) filters.autoRiskLevel = autoRiskEl.value || '';
+  }
+}
+
 document.addEventListener('input', (event) => {
   const view = state.config.views.find((entry) => entry.id && (event.target.id === `search-${entry.id}` || event.target.id === `status-${entry.id}` || event.target.id === `filter-${entry.id}` || event.target.id === `autoRisk-${entry.id}`));
-  if (view) $(`#list-${view.id}`).innerHTML = renderList(view);
+  if (view) {
+    syncFilterFromDom(view);
+    $(`#list-${view.id}`).innerHTML = renderList(view);
+  }
 });
 
 document.addEventListener('change', (event) => {
   const view = state.config.views.find((entry) => entry.id && (event.target.id === `status-${entry.id}` || event.target.id === `filter-${entry.id}` || event.target.id === `typeFilter-${entry.id}` || event.target.id === `autoRisk-${entry.id}`));
   if (view) {
+    syncFilterFromDom(view);
     $(`#list-${view.id}`).innerHTML = renderList(view);
   }
   const draftCheck = event.target.closest('[data-draft-check]');
