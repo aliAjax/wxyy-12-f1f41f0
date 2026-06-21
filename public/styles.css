@@ -224,6 +224,22 @@ main {
   margin-bottom: 12px;
 }
 
+.toolbar.toolbar-wide {
+  grid-template-columns: 1fr 160px 160px 160px;
+}
+
+@media (max-width: 980px) {
+  .toolbar.toolbar-wide {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .toolbar.toolbar-wide {
+    grid-template-columns: 1fr;
+  }
+}
+
 .list {
   display: grid;
   gap: 12px;

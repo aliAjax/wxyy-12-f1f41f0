@@ -237,22 +237,24 @@ function photoEntryHtml(fieldName, photo = {}) {
   </div>`;
 }
 
-function photosBadgeHtml(item) {
+function photosBadgeHtml(item, collection) {
   const photos = item.photos || [];
   if (!photos.length) return '';
-  return `<button class="photos-badge" data-view-photos="${item.id}">
+  return `<button class="photos-badge" data-view-photos="${collection}:${item.id}">
     <span class="photos-icon">📷</span>
     <span>${photos.length} 张照片</span>
   </button>`;
 }
 
-function renderPhotoModal(surveyId) {
-  const survey = state.db.surveys?.find((s) => s.id === surveyId);
-  if (!survey || !survey.photos?.length) return;
-  const site = state.db.sites?.find((s) => s.id === survey.siteId);
+function renderPhotoModal(photoKey) {
+  const [collection, id] = photoKey.split(':');
+  const item = state.db[collection]?.find((entry) => entry.id === id);
+  if (!item || !item.photos?.length) return;
+  const site = state.db.sites?.find((s) => s.id === item.siteId);
   const siteLabel = site ? `${site.cave} / ${site.zone} / ${site.pointCode}` : '';
-  $('#photoModalTitle').textContent = `照片证据 - ${survey.surveyor} / ${survey.date}`;
-  $('#photoModalBody').innerHTML = survey.photos.map((photo, index) => `
+  const titleLabel = item.surveyor ? `${item.surveyor} / ${item.date}` : (item.eventType ? `${item.eventType} / ${item.reporter}` : item.id);
+  $('#photoModalTitle').textContent = `照片证据 - ${titleLabel}`;
+  $('#photoModalBody').innerHTML = item.photos.map((photo, index) => `
     <div class="photo-detail">
       <div class="photo-detail-head">
         <span class="photo-detail-index">照片 ${index + 1}</span>
@@ -418,7 +420,7 @@ function renderCard(item, collection, view) {
     .map((action) => `<button class="${action.danger ? 'danger' : 'ghost'}" data-action="${action.id}" data-id="${item.id}">${escapeHtml(action.label)}</button>`)
     .join('');
   return `<article class="card">
-    <div class="card-head"><h3>${escapeHtml(title)}</h3><div class="card-head-right">${statusValue ? pill(statusValue, toneFor(statusValue)) : ''}${photosBadgeHtml(item)}</div></div>
+    <div class="card-head"><h3>${escapeHtml(title)}</h3><div class="card-head-right">${statusValue ? pill(statusValue, toneFor(statusValue)) : ''}${photosBadgeHtml(item, collection)}</div></div>
     ${relation}
     ${siteListHtml}
     ${summary ? `<p>${escapeHtml(summary)}</p>` : ''}
@@ -434,6 +436,7 @@ function renderList(view) {
   const query = $(`#search-${view.id}`)?.value.trim() || '';
   const status = $(`#status-${view.id}`)?.value || '';
   const filterValue = view.filterField ? ($(`#filter-${view.id}`)?.value || '') : '';
+  const typeFilterValue = view.typeFilterField ? ($(`#typeFilter-${view.id}`)?.value || '') : '';
   let items = [...(state.db[collection] || [])];
   if (query) {
     items = items.filter((item) => view.searchFields.some((field) => searchValueByPath(item, field).includes(query)));
@@ -443,6 +446,9 @@ function renderList(view) {
   }
   if (filterValue && view.filterField) {
     items = items.filter((item) => item[view.filterField] === filterValue);
+  }
+  if (typeFilterValue && view.typeFilterField) {
+    items = items.filter((item) => item[view.typeFilterField] === typeFilterValue);
   }
   return items.length ? items.map((item) => renderCard(item, collection, view)).join('') : `<div class="empty">暂无${escapeHtml(collectionLabel(collection))}</div>`;
 }
@@ -671,11 +677,14 @@ function renderConfigView(view) {
 function renderCrudView(view) {
   const statusOptions = view.statusOptions || [];
   const filterOptions = view.filterField ? [...new Set((state.db[view.collection] || []).map((item) => item[view.filterField]).filter(Boolean))] : [];
+  const typeFilterOptions = view.typeFilterOptions || (view.typeFilterField ? [...new Set((state.db[view.collection] || []).map((item) => item[view.typeFilterField]).filter(Boolean))] : []);
   const isSurveyView = view.collection === 'surveys';
   const draftActions = isSurveyView
     ? `<button type="button" class="ghost" data-save-draft>保存草稿（离线暂存）</button>`
     : '';
   const submitLabel = isSurveyView && state.editingDraftId ? '更新草稿并提交入库' : (view.submitLabel || '保存');
+  const hasExtraFilters = view.filterField || view.typeFilterField;
+  const toolbarClass = hasExtraFilters ? 'toolbar toolbar-wide' : 'toolbar';
   return `<section class="view" id="${view.id}">
     <div class="grid">
       <form class="panel" data-create="${view.collection}" data-view="${view.id}">
@@ -685,7 +694,7 @@ function renderCrudView(view) {
       </form>
       <div class="panel">
         <h2>${escapeHtml(view.listTitle)} <span class="muted-text">（已入库记录）</span></h2>
-        <div class="toolbar">
+        <div class="${toolbarClass}">
           <input id="search-${view.id}" placeholder="${escapeHtml(view.searchPlaceholder || '搜索')}">
           <select id="status-${view.id}">
             <option value="">全部状态</option>
@@ -694,6 +703,10 @@ function renderCrudView(view) {
           ${view.filterField ? `<select id="filter-${view.id}">
             <option value="">全部${escapeHtml(view.filterLabel || view.filterField)}</option>
             ${filterOptions.map((option) => `<option>${escapeHtml(option)}</option>`).join('')}
+          </select>` : ''}
+          ${view.typeFilterField ? `<select id="typeFilter-${view.id}">
+            <option value="">全部${escapeHtml(view.typeFilterLabel || view.typeFilterField)}</option>
+            ${typeFilterOptions.map((option) => `<option>${escapeHtml(option)}</option>`).join('')}
           </select>` : ''}
         </div>
         <div class="list" id="list-${view.id}">${renderList(view)}</div>
@@ -1058,7 +1071,7 @@ document.addEventListener('input', (event) => {
 });
 
 document.addEventListener('change', (event) => {
-  const view = state.config.views.find((entry) => entry.id && (event.target.id === `status-${entry.id}` || event.target.id === `filter-${entry.id}`));
+  const view = state.config.views.find((entry) => entry.id && (event.target.id === `status-${entry.id}` || event.target.id === `filter-${entry.id}` || event.target.id === `typeFilter-${entry.id}`));
   if (view) $(`#list-${view.id}`).innerHTML = renderList(view);
   const draftCheck = event.target.closest('[data-draft-check]');
   if (draftCheck) {

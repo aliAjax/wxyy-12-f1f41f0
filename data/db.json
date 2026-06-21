@@ -833,5 +833,113 @@
       ]
     }
   ],
-  "reviews": []
+  "reviews": [],
+  "incidents": [
+    {
+      "id": "incident-seed-1",
+      "siteId": "site-seed-1",
+      "surveyId": "survey-seed-1",
+      "eventType": "护栏触碰",
+      "severity": "一般",
+      "status": "待处理",
+      "reporter": "沈宁",
+      "occurredAt": "2026-06-18T10:30:00.000Z",
+      "description": "游客步道外侧栏杆发现新鲜触碰痕迹，钟乳石表面有轻微划痕，疑为游客越线触摸所致。",
+      "handlingNote": "",
+      "photos": [
+        {
+          "id": "photo-inc-1",
+          "title": "栏杆触碰痕迹",
+          "url": "https://images.unsplash.com/photo-1541974898-8707f6f0d2c2?w=800",
+          "location": "北麓三号洞 / 滴水帘区 / D-07",
+          "description": "游客步道外侧栏杆发现新鲜触碰痕迹"
+        }
+      ],
+      "createdAt": "2026-06-18T10:45:00.000Z",
+      "updatedAt": "2026-06-18T10:45:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-18T10:45:00.000Z",
+          "action": "创建",
+          "note": "巡测中发现护栏触碰痕迹"
+        }
+      ]
+    },
+    {
+      "id": "incident-seed-2",
+      "siteId": "site-seed-6",
+      "surveyId": "survey-seed-4",
+      "eventType": "人员误入",
+      "severity": "严重",
+      "status": "处理中",
+      "reporter": "王芳",
+      "occurredAt": "2026-06-17T14:20:00.000Z",
+      "description": "深部廊道暂停开放区域发现游客脚印，疑似有人绕过警示标识进入禁入区，存在安全隐患。",
+      "handlingNote": "已通知安保加强巡逻，正在调查涉事人员",
+      "photos": [],
+      "createdAt": "2026-06-17T15:00:00.000Z",
+      "updatedAt": "2026-06-17T16:30:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-17T16:30:00.000Z",
+          "action": "开始处理",
+          "note": "已联系安保部门介入"
+        },
+        {
+          "at": "2026-06-17T15:00:00.000Z",
+          "action": "创建",
+          "note": "发现人员误入禁入区"
+        }
+      ]
+    },
+    {
+      "id": "incident-seed-3",
+      "siteId": "site-seed-9",
+      "surveyId": "",
+      "eventType": "灯光异常",
+      "severity": "一般",
+      "status": "已处理",
+      "reporter": "李明",
+      "occurredAt": "2026-06-20T11:30:00.000Z",
+      "description": "石笋森林区景观照明灯部分熄灭，影响游客观赏体验，已联系维修。",
+      "handlingNote": "维修人员已更换损坏灯管，照明恢复正常",
+      "photos": [],
+      "createdAt": "2026-06-20T11:45:00.000Z",
+      "updatedAt": "2026-06-20T15:00:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-20T15:00:00.000Z",
+          "action": "处理完成",
+          "note": "灯管已更换"
+        },
+        {
+          "at": "2026-06-20T11:45:00.000Z",
+          "action": "创建",
+          "note": "景观灯故障"
+        }
+      ]
+    },
+    {
+      "id": "incident-seed-4",
+      "siteId": "site-seed-4",
+      "surveyId": "survey-seed-3",
+      "eventType": "设备损坏",
+      "severity": "紧急",
+      "status": "待处理",
+      "reporter": "沈宁",
+      "occurredAt": "2026-06-19T10:20:00.000Z",
+      "description": "水晶花厅稀有方解石花群落旁监测支架被碰倒，传感器受损，疑为游客拍照时不慎碰倒。",
+      "handlingNote": "",
+      "photos": [],
+      "createdAt": "2026-06-19T10:35:00.000Z",
+      "updatedAt": "2026-06-19T10:35:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-19T10:35:00.000Z",
+          "action": "创建",
+          "note": "监测设备被游客碰倒"
+        }
+      ]
+    }
+  ]
 }

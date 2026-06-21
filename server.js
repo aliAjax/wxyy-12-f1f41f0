@@ -114,6 +114,13 @@ app.post('/api/:collection', async (req, res) => {
   const db = await readDb();
   const { collection } = req.params;
   if (!Array.isArray(db[collection])) return res.status(404).json({ error: 'unknown collection' });
+  if (collection === 'incidents') {
+    const siteId = req.body.siteId;
+    if (siteId) {
+      const siteExists = db.sites?.some((s) => s.id === siteId);
+      if (!siteExists) return res.status(400).json({ error: '关联样点不存在，无法创建事件' });
+    }
+  }
   const now = new Date().toISOString();
   const thresholdRules = getThresholdRules(db);
   const item = {
@@ -225,7 +232,7 @@ function findRelated(db, relation, item) {
 function runAction(db, action, item) {
   const related = action.relation ? findRelated(db, action.relation, item) : null;
   const context = { item, related };
-  const levelRank = { '低': 1, '中': 2, '高': 3 };
+  const levelRank = { '低': 1, '中': 2, '高': 3, '一般': 1, '严重': 2, '紧急': 3 };
   for (const guard of action.guards || []) {
     const left = getValue(context, guard.left);
     const right = guard.rightPath ? getValue(context, guard.rightPath) : guard.right;
@@ -353,6 +360,40 @@ app.get('/api/zone-detail/:cave/:zone', async (req, res) => {
     zone,
     sites,
     recentSurveys: sortedSurveys
+  });
+});
+
+app.get('/api/incident-stats', async (req, res) => {
+  const db = await readDb();
+  const incidents = db.incidents || [];
+  const sites = db.sites || [];
+
+  const byType = {};
+  const bySeverity = {};
+  const byStatus = {};
+  const byCave = {};
+
+  for (const inc of incidents) {
+    byType[inc.eventType] = (byType[inc.eventType] || 0) + 1;
+    bySeverity[inc.severity] = (bySeverity[inc.severity] || 0) + 1;
+    byStatus[inc.status] = (byStatus[inc.status] || 0) + 1;
+
+    const site = sites.find((s) => s.id === inc.siteId);
+    if (site) {
+      const cave = site.cave || '未分类';
+      byCave[cave] = (byCave[cave] || 0) + 1;
+    }
+  }
+
+  const recent = incidents.sort(sortNewest).slice(0, 10);
+
+  res.json({
+    total: incidents.length,
+    byType,
+    bySeverity,
+    byStatus,
+    byCave,
+    recent
   });
 });
 

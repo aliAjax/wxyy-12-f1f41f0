@@ -33,12 +33,18 @@ module.exports = {
     '正常': 'ok',
     '已复查': 'ok',
     '已完成': 'ok',
+    '已处理': 'ok',
+    '已关闭': 'ok',
     '待执行': 'warn',
     '待处理': 'warn',
+    '处理中': 'warn',
     '重点保护': 'warn',
     '预警': 'warn',
+    '一般': 'warn',
     '异常待复查': 'bad',
     '高风险': 'bad',
+    '严重': 'bad',
+    '紧急': 'bad',
     '暂停开放': 'bad'
   },
   thresholdRules: {
@@ -50,7 +56,8 @@ module.exports = {
     sites: { label: '样点档案' },
     surveys: { label: '巡测记录' },
     plans: { label: '巡测计划' },
-    reviews: { label: '复查任务' }
+    reviews: { label: '复查任务' },
+    incidents: { label: '干扰事件' }
   },
   stats: [
     { label: '样点', collection: 'sites' },
@@ -62,7 +69,11 @@ module.exports = {
     { label: '巡测计划', collection: 'plans' },
     { label: '待执行', collection: 'plans', filter: { field: 'status', value: '待执行' } },
     { label: '复查任务', collection: 'reviews' },
-    { label: '待处理复查', collection: 'reviews', filter: { field: 'status', value: '待处理' } }
+    { label: '待处理复查', collection: 'reviews', filter: { field: 'status', value: '待处理' } },
+    { label: '干扰事件', collection: 'incidents' },
+    { label: '待处理事件', collection: 'incidents', filter: { field: 'status', value: '待处理' } },
+    { label: '严重事件', collection: 'incidents', filter: { field: 'severity', value: '严重' } },
+    { label: '紧急事件', collection: 'incidents', filter: { field: 'severity', value: '紧急' } }
   ],
   views: [
     {
@@ -217,6 +228,45 @@ module.exports = {
         { label: '任务状态', name: 'status', type: 'select', options: ['待处理', '已完成'] },
         { label: '处理建议', name: 'suggestion', type: 'textarea', wide: true }
       ]
+    },
+    {
+      id: 'incidents',
+      label: '干扰事件',
+      collection: 'incidents',
+      formTitle: '登记干扰事件',
+      listTitle: '事件历史',
+      submitLabel: '保存事件',
+      searchPlaceholder: '搜索事件描述、上报人、处理说明',
+      searchFields: ['description', 'reporter', 'handlingNote', 'photos.title', 'photos.description'],
+      statusField: 'status',
+      statusOptions: ['待处理', '处理中', '已处理', '已关闭'],
+      filterField: 'severity',
+      filterLabel: '严重程度',
+      typeFilterField: 'eventType',
+      typeFilterLabel: '事件类型',
+      typeFilterOptions: ['护栏触碰', '灯光异常', '人员误入', '设备损坏', '其他干扰'],
+      titleFields: ['eventType', 'occurredAt'],
+      relation: { collection: 'sites', localKey: 'siteId', labelFields: ['cave', 'zone', 'pointCode'] },
+      summaryFields: ['description', 'handlingNote'],
+      detailFields: [
+        { label: '严重程度', name: 'severity' },
+        { label: '事件类型', name: 'eventType' },
+        { label: '上报人', name: 'reporter' },
+        { label: '发生时间', name: 'occurredAt' }
+      ],
+      defaults: { status: '待处理', severity: '一般', photos: [], handlingNote: '', surveyId: '' },
+      fields: [
+        { label: '关联样点', name: 'siteId', type: 'relation', collection: 'sites', labelFields: ['cave', 'zone', 'pointCode'], required: true, wide: true },
+        { label: '关联巡测记录', name: 'surveyId', type: 'relation', collection: 'surveys', labelFields: ['surveyor', 'date'], withSite: true, wide: true },
+        { label: '事件类型', name: 'eventType', type: 'select', options: ['护栏触碰', '灯光异常', '人员误入', '设备损坏', '其他干扰'], required: true },
+        { label: '严重程度', name: 'severity', type: 'select', options: ['一般', '严重', '紧急'], required: true },
+        { label: '上报人', name: 'reporter', required: true },
+        { label: '发生时间', name: 'occurredAt', type: 'datetime-local' },
+        { label: '事件描述', name: 'description', type: 'textarea', required: true, wide: true },
+        { label: '照片证据', name: 'photos', type: 'photos', wide: true },
+        { label: '处理状态', name: 'status', type: 'select', options: ['待处理', '处理中', '已处理', '已关闭'] },
+        { label: '处理说明', name: 'handlingNote', type: 'textarea', wide: true }
+      ]
     }
   ],
   actions: [
@@ -246,6 +296,54 @@ module.exports = {
         { target: 'related', field: 'status', value: '已复查' },
         { target: 'related', field: 'reviewNote', valuePath: 'item.suggestion' }
       ]
+    },
+    {
+      id: 'incident-processing',
+      label: '开始处理',
+      collection: 'incidents',
+      patches: [
+        { field: 'status', value: '处理中' }
+      ]
+    },
+    {
+      id: 'incident-resolve',
+      label: '处理完成',
+      collection: 'incidents',
+      patches: [
+        { field: 'status', value: '已处理' }
+      ]
+    },
+    {
+      id: 'incident-close',
+      label: '关闭事件',
+      collection: 'incidents',
+      patches: [
+        { field: 'status', value: '已关闭' }
+      ]
+    },
+    {
+      id: 'incident-reopen',
+      label: '重新打开',
+      collection: 'incidents',
+      patches: [
+        { field: 'status', value: '待处理' }
+      ]
+    },
+    {
+      id: 'incident-suspend-site',
+      label: '暂停样点开放',
+      collection: 'incidents',
+      danger: true,
+      relation: { collection: 'sites', localKey: 'siteId' },
+      guards: [
+        { op: 'levelGte', left: 'item.severity', right: '严重', message: '仅严重及以上事件才可暂停样点' },
+        { op: 'notIn', left: 'related.protectedStatus', values: ['暂停开放'], message: '样点已处于暂停开放状态' }
+      ],
+      patches: [
+        { field: 'status', value: '处理中' },
+        { target: 'related', field: 'protectedStatus', value: '暂停开放' }
+      ],
+      note: '因关联干扰事件暂停开放'
     }
   ]
 };
