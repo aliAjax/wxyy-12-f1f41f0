@@ -5,7 +5,10 @@ const state = {
   selectedDraftIds: new Set(),
   editingDraftId: null,
   zoneOverview: null,
-  activeZoneDetail: null
+  activeZoneDetail: null,
+  importCsvText: '',
+  importPreviewData: null,
+  importResultData: null
 };
 
 const DRAFT_STORAGE_KEY = 'wxyy_survey_drafts_v1';
@@ -841,6 +844,137 @@ function getLatestSurveyForSite(siteId) {
   return surveys.sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0))[0];
 }
 
+function renderImportView(view) {
+  const csvText = state.importCsvText || '';
+  const previewData = state.importPreviewData;
+  const resultData = state.importResultData;
+  const hasPreview = previewData && previewData.preview && previewData.preview.length > 0;
+  const hasResult = resultData !== null;
+
+  let previewHtml = '';
+  if (hasPreview && !hasResult) {
+    const statsHtml = `
+      <div class="import-stat"><span>总计</span><strong>${previewData.total}</strong></div>
+      <div class="import-stat ok"><span>有效</span><strong>${previewData.valid}</strong></div>
+      <div class="import-stat bad"><span>无效</span><strong>${previewData.invalid}</strong></div>
+      ${previewData.missingRequired && previewData.missingRequired.length ? `<div class="import-stat warn"><span>缺少必填列</span><strong>${previewData.missingRequired.join('、')}</strong></div>` : ''}
+    `;
+    const rowsHtml = previewData.preview.map((row) => {
+      const statusCell = row.isValid
+        ? `<span class="pill ok">有效</span>`
+        : `<span class="pill bad" title="${escapeHtml(row.errors.join('；'))}">${row.errors.length} 项错误</span>`;
+      const rowClass = row.isValid ? '' : ' import-row-error';
+      const errorTooltip = row.isValid ? '' : `<div class="import-error-tip">${row.errors.map((e) => `<span>• ${escapeHtml(e)}</span>`).join('')}</div>`;
+      return `<tr class="${rowClass}">
+        <td>${row.lineNumber}</td>
+        <td class="import-pointcode">${escapeHtml(row.pointCode)}</td>
+        <td class="import-sitelabel">${escapeHtml(row.siteLabel || '-')}</td>
+        <td>${escapeHtml(row.temperature)}</td>
+        <td>${escapeHtml(row.humidity)}</td>
+        <td>${escapeHtml(row.co2)}</td>
+        <td>${escapeHtml(row.dripRate)}</td>
+        <td>${escapeHtml(row.surveyor || '-')}</td>
+        <td>${escapeHtml(row.date || '-')}</td>
+        <td>${statusCell}${errorTooltip}</td>
+      </tr>`;
+    }).join('');
+    previewHtml = `
+      <div class="import-preview-area">
+        <div class="import-stats">${statsHtml}</div>
+        <div class="import-preview-table-wrap">
+          <table class="import-preview-table">
+            <thead>
+              <tr>
+                <th>行号</th>
+                <th>样点编号</th>
+                <th>样点信息</th>
+                <th>温度(℃)</th>
+                <th>湿度(%)</th>
+                <th>CO2(ppm)</th>
+                <th>滴水频率</th>
+                <th>巡测人员</th>
+                <th>日期</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  let resultHtml = '';
+  if (hasResult) {
+    const resultCardHtml = `
+      <div class="import-result-card">
+        <div class="import-result-title">导入完成</div>
+        <div class="import-result-stats">
+          <div class="import-stat"><span>总计</span><strong>${resultData.total}</strong></div>
+          <div class="import-stat ok"><span>成功</span><strong>${resultData.success}</strong></div>
+          <div class="import-stat bad"><span>失败</span><strong>${resultData.failed}</strong></div>
+        </div>
+      </div>
+    `;
+    let failedHtml = '';
+    if (resultData.failed > 0 && resultData.failedItems) {
+      const failedItemsHtml = resultData.failedItems.map((item) => `
+        <div class="import-failed-item">
+          <div class="import-failed-head">
+            <span class="import-failed-line">第 ${item.lineNumber} 行</span>
+            <span class="import-failed-point">${escapeHtml(item.pointCode || '无样点')}</span>
+          </div>
+          <div class="import-failed-errors">
+            ${item.errors.map((e) => `<span class="pill bad">${escapeHtml(e)}</span>`).join('')}
+          </div>
+        </div>
+      `).join('');
+      failedHtml = `
+        <div id="importFailedList">
+          <h3>失败明细</h3>
+          <div>${failedItemsHtml}</div>
+        </div>
+      `;
+    }
+    resultHtml = `
+      <div class="import-result-area">
+        <div class="import-result-summary">${resultCardHtml}</div>
+        ${failedHtml}
+      </div>
+    `;
+  }
+
+  const submitDisabled = !previewData || previewData.valid === 0;
+
+  return `<section class="view" id="${view.id}">
+    <div class="grid single">
+      <div class="panel import-panel">
+        <h2>${escapeHtml(view.formTitle)}</h2>
+        <p class="config-desc">将传感器导出的 CSV 数据粘贴到下方文本框，系统将自动解析并校验样点编号和数据格式。校验通过后可批量写入巡测记录。</p>
+        <div class="import-format-hint">
+          <strong>CSV格式说明：</strong>
+          <span>支持的列名（中英文均可）：样点编号、温度、湿度、CO2、滴水频率、巡测人员、日期、干扰痕迹</span>
+          <span>必填列：样点编号、温度、湿度、CO2、滴水频率</span>
+        </div>
+        <label class="wide">
+          CSV 文本
+          <textarea id="importCsvText" placeholder="样点编号,温度,湿度,CO2,滴水频率,巡测人员,日期
+D-07,17.2,88,720,12,沈宁,2026-06-20
+A-01,18.0,85,560,0,李明,2026-06-20
+C-03,16.5,93,760,8,王芳,2026-06-20">${escapeHtml(csvText)}</textarea>
+        </label>
+        <div class="actions import-actions">
+          <button id="importPreviewBtn" class="secondary">预览解析结果</button>
+          <button id="importSubmitBtn" ${submitDisabled ? 'disabled' : ''}>确认导入</button>
+          <button id="importClearBtn" class="ghost">清空</button>
+        </div>
+        ${previewHtml}
+        ${resultHtml}
+      </div>
+    </div>
+  </section>`;
+}
+
 function renderZonemapView(view) {
   const caves = state.zoneOverview?.caves || [];
   if (!state.zoneDetailCache) state.zoneDetailCache = {};
@@ -882,6 +1016,7 @@ function render() {
     if (view.type === 'dashboard') return renderDashboardView(view);
     if (view.type === 'config') return renderConfigView(view);
     if (view.type === 'zonemap') return renderZonemapView(view);
+    if (view.type === 'import') return renderImportView(view);
     return renderCrudView(view);
   }).join('');
   $('#main').innerHTML = viewsHtml + renderDraftsView();
@@ -932,6 +1067,55 @@ async function toggleZoneDetail(cardEl) {
   }
 }
 
+async function previewImport() {
+  const csvText = $('#importCsvText')?.value.trim();
+  if (!csvText) {
+    toast('请先粘贴 CSV 文本');
+    return;
+  }
+  state.importCsvText = csvText;
+  try {
+    const result = await api('/api/surveys/import/preview', { method: 'POST', body: JSON.stringify({ csvText }) });
+    state.importPreviewData = result;
+    state.importResultData = null;
+    render();
+    setTab('import');
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+async function submitImport() {
+  const csvText = state.importCsvText;
+  if (!csvText) {
+    toast('请先粘贴 CSV 文本');
+    return;
+  }
+  try {
+    const result = await api('/api/surveys/import', { method: 'POST', body: JSON.stringify({ csvText }) });
+    state.importResultData = result;
+    state.importPreviewData = null;
+    await load();
+    if (result.failed === 0) {
+      toast(`全部导入成功（${result.success} 条）`);
+    } else if (result.success === 0) {
+      toast(`全部导入失败（${result.failed} 条）`);
+    } else {
+      toast(`部分成功：${result.success} 条，失败 ${result.failed} 条`);
+    }
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+function clearImport() {
+  state.importCsvText = '';
+  state.importPreviewData = null;
+  state.importResultData = null;
+  render();
+  setTab('import');
+}
+
 document.addEventListener('click', async (event) => {
   const tab = event.target.closest('.tab');
   const action = event.target.closest('[data-action]');
@@ -948,6 +1132,9 @@ document.addEventListener('click', async (event) => {
   const deleteSelBtn = event.target.closest('#draftDeleteSelected');
   const clearErrBtn = event.target.closest('#draftClearErrors');
   const zoneCard = event.target.closest('.zone-card');
+  const importPreviewBtn = event.target.closest('#importPreviewBtn');
+  const importSubmitBtn = event.target.closest('#importSubmitBtn');
+  const importClearBtn = event.target.closest('#importClearBtn');
   if (tab) setTab(tab.dataset.tab);
   if (zoneCard && !event.target.closest('.zone-detail') && !event.target.closest('.zone-detail-loading')) {
     event.preventDefault();
@@ -1062,6 +1249,15 @@ document.addEventListener('click', async (event) => {
     DraftStore.clearErrors();
     refreshDraftsView();
     toast('已清除失败标记');
+  }
+  if (importPreviewBtn) {
+    await previewImport();
+  }
+  if (importSubmitBtn) {
+    await submitImport();
+  }
+  if (importClearBtn) {
+    clearImport();
   }
 });
 

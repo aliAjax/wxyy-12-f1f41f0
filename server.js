@@ -396,6 +396,255 @@ app.get('/api/incident-stats', async (req, res) => {
   });
 });
 
+function parseCsv(text) {
+  const lines = text.trim().split(/\r?\n/).filter((line) => line.trim());
+  if (!lines.length) return { headers: [], rows: [] };
+  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  const rows = lines.slice(1).map((line, index) => {
+    const values = line.split(',').map((v) => v.trim());
+    const row = {};
+    headers.forEach((header, i) => {
+      row[header] = values[i] || '';
+    });
+    return { lineNumber: index + 2, raw: line, values: row };
+  });
+  return { headers, rows };
+}
+
+function normalizeHeaders(headers) {
+  const map = {};
+  const aliases = {
+    '样点编号': 'pointCode', '点位编号': 'pointCode', 'pointcode': 'pointCode', 'point_code': 'pointCode', 'point code': 'pointCode',
+    '温度': 'temperature', 'temp': 'temperature', 'temperature': 'temperature',
+    '湿度': 'humidity', 'humidity': 'humidity', 'hum': 'humidity',
+    'co2': 'co2', 'CO2': 'co2', '二氧化碳': 'co2',
+    '滴水频率': 'dripRate', '滴水速率': 'dripRate', 'driprate': 'dripRate', 'drip_rate': 'dripRate', 'drip rate': 'dripRate',
+    '巡测人员': 'surveyor', '测量员': 'surveyor', 'surveyor': 'surveyor',
+    '日期': 'date', '测量日期': 'date', 'date': 'date',
+    '干扰痕迹': 'disturbance', '干扰': 'disturbance', 'disturbance': 'disturbance'
+  };
+  headers.forEach((header) => {
+    const normalized = aliases[header] || header;
+    map[header] = normalized;
+  });
+  return map;
+}
+
+app.post('/api/surveys/import/preview', async (req, res) => {
+  const { csvText } = req.body;
+  if (!csvText || typeof csvText !== 'string') {
+    return res.status(400).json({ error: 'CSV文本不能为空' });
+  }
+
+  const db = await readDb();
+  const sites = db.sites || [];
+  const siteMap = new Map(sites.map((s) => [s.pointCode, s]));
+
+  const { headers, rows } = parseCsv(csvText);
+  if (!rows.length) {
+    return res.json({ total: 0, valid: 0, invalid: 0, preview: [], errors: [] });
+  }
+
+  const headerMap = normalizeHeaders(headers);
+  const requiredFields = ['pointCode', 'temperature', 'humidity', 'co2', 'dripRate'];
+  const missingRequired = requiredFields.filter((f) => !Object.values(headerMap).includes(f));
+
+  const preview = [];
+  const errors = [];
+
+  for (const row of rows) {
+    const normalized = {};
+    Object.keys(row.values).forEach((key) => {
+      const normKey = headerMap[key];
+      if (normKey) normalized[normKey] = row.values[key];
+    });
+
+    const rowErrors = [];
+
+    if (!normalized.pointCode) {
+      rowErrors.push('缺少样点编号');
+    } else if (!siteMap.has(normalized.pointCode)) {
+      rowErrors.push(`未知样点编号: ${normalized.pointCode}`);
+    }
+
+    const numFields = [
+      { key: 'temperature', label: '温度' },
+      { key: 'humidity', label: '湿度' },
+      { key: 'co2', label: 'CO2' },
+      { key: 'dripRate', label: '滴水频率' }
+    ];
+
+    for (const field of numFields) {
+      const val = normalized[field.key];
+      if (val === '' || val === undefined || val === null) {
+        rowErrors.push(`缺少${field.label}`);
+      } else if (isNaN(Number(val))) {
+        rowErrors.push(`${field.label}数字格式错误: ${val}`);
+      } else if (Number(val) < 0) {
+        rowErrors.push(`${field.label}不能为负数: ${val}`);
+      }
+    }
+
+    if (normalized.date && isNaN(Date.parse(normalized.date))) {
+      rowErrors.push(`日期格式错误: ${normalized.date}`);
+    }
+
+    const site = siteMap.get(normalized.pointCode) || null;
+    preview.push({
+      lineNumber: row.lineNumber,
+      pointCode: normalized.pointCode || '',
+      siteLabel: site ? `${site.cave} / ${site.zone} / ${site.pointCode}` : '',
+      temperature: normalized.temperature || '',
+      humidity: normalized.humidity || '',
+      co2: normalized.co2 || '',
+      dripRate: normalized.dripRate || '',
+      surveyor: normalized.surveyor || '',
+      date: normalized.date || '',
+      disturbance: normalized.disturbance || '',
+      isValid: rowErrors.length === 0,
+      errors: rowErrors
+    });
+
+    if (rowErrors.length) {
+      errors.push({ line: row.lineNumber, errors: rowErrors });
+    }
+  }
+
+  const validCount = preview.filter((p) => p.isValid).length;
+
+  res.json({
+    total: rows.length,
+    valid: validCount,
+    invalid: rows.length - validCount,
+    missingRequired,
+    preview
+  });
+});
+
+app.post('/api/surveys/import', async (req, res) => {
+  const { csvText } = req.body;
+  if (!csvText || typeof csvText !== 'string') {
+    return res.status(400).json({ error: 'CSV文本不能为空' });
+  }
+
+  const db = await readDb();
+  const sites = db.sites || [];
+  const siteMap = new Map(sites.map((s) => [s.pointCode, s]));
+  const thresholdRules = getThresholdRules(db);
+
+  const { headers, rows } = parseCsv(csvText);
+  const headerMap = normalizeHeaders(headers);
+
+  const successItems = [];
+  const failedItems = [];
+  const now = new Date().toISOString();
+
+  for (const row of rows) {
+    const normalized = {};
+    Object.keys(row.values).forEach((key) => {
+      const normKey = headerMap[key];
+      if (normKey) normalized[normKey] = row.values[key];
+    });
+
+    const rowErrors = [];
+
+    if (!normalized.pointCode) {
+      rowErrors.push('缺少样点编号');
+    } else if (!siteMap.has(normalized.pointCode)) {
+      rowErrors.push(`未知样点编号: ${normalized.pointCode}`);
+    }
+
+    const numFields = [
+      { key: 'temperature', label: '温度' },
+      { key: 'humidity', label: '湿度' },
+      { key: 'co2', label: 'CO2' },
+      { key: 'dripRate', label: '滴水频率' }
+    ];
+
+    for (const field of numFields) {
+      const val = normalized[field.key];
+      if (val === '' || val === undefined || val === null) {
+        rowErrors.push(`缺少${field.label}`);
+      } else if (isNaN(Number(val))) {
+        rowErrors.push(`${field.label}数字格式错误: ${val}`);
+      } else if (Number(val) < 0) {
+        rowErrors.push(`${field.label}不能为负数: ${val}`);
+      }
+    }
+
+    if (normalized.date && isNaN(Date.parse(normalized.date))) {
+      rowErrors.push(`日期格式错误: ${normalized.date}`);
+    }
+
+    if (rowErrors.length) {
+      failedItems.push({
+        lineNumber: row.lineNumber,
+        pointCode: normalized.pointCode || '',
+        errors: rowErrors
+      });
+      continue;
+    }
+
+    const site = siteMap.get(normalized.pointCode);
+    const surveyData = {
+      siteId: site.id,
+      surveyor: normalized.surveyor || '批量导入',
+      date: normalized.date || new Date().toISOString().slice(0, 10),
+      temperature: Number(normalized.temperature),
+      humidity: Number(normalized.humidity),
+      co2: Number(normalized.co2),
+      dripRate: Number(normalized.dripRate),
+      disturbance: normalized.disturbance || '',
+      photos: [],
+      status: '正常',
+      reviewNote: '',
+      manuallyReviewed: false
+    };
+
+    const risk = computeAutoRisk(surveyData, site, thresholdRules);
+    surveyData.autoRiskLevel = risk.autoRiskLevel;
+    surveyData.autoRiskReasons = risk.autoRiskReasons;
+    surveyData.deviationTemp = risk.deviationTemp;
+    surveyData.deviationHumidity = risk.deviationHumidity;
+    surveyData.deviationCo2 = risk.deviationCo2;
+
+    if (risk.autoRiskLevel === '高风险') {
+      surveyData.status = '异常待复查';
+    }
+
+    const riskNote = risk.autoRiskLevel !== '正常'
+      ? `自动判定：${risk.autoRiskLevel}（${risk.autoRiskReasons.join('；')}）`
+      : '自动判定：正常';
+
+    const item = {
+      id: `surveys-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
+      ...surveyData,
+      createdAt: now,
+      updatedAt: now,
+      history: [stamp('创建', `批量导入 · ${riskNote}`)]
+    };
+
+    db.surveys.push(item);
+    successItems.push({
+      lineNumber: row.lineNumber,
+      id: item.id,
+      pointCode: normalized.pointCode,
+      autoRiskLevel: item.autoRiskLevel,
+      status: item.status
+    });
+  }
+
+  await writeDb(db);
+
+  res.json({
+    total: rows.length,
+    success: successItems.length,
+    failed: failedItems.length,
+    successItems,
+    failedItems
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`${config.title} running at http://localhost:${PORT}`);
 });

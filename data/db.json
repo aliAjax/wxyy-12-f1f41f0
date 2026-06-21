@@ -186,7 +186,7 @@
       "route": "东线巡测",
       "sensitivity": "低",
       "protectedStatus": "常规观察",
-      "baselineTemp": 18.0,
+      "baselineTemp": 18,
       "baselineHumidity": 82,
       "baselineCo2": 500,
       "note": "南洞前厅过渡区",
@@ -208,7 +208,7 @@
       "route": "东线巡测",
       "sensitivity": "高",
       "protectedStatus": "重点保护",
-      "baselineTemp": 16.0,
+      "baselineTemp": 16,
       "baselineHumidity": 93,
       "baselineCo2": 690,
       "note": "密集石笋分布区域",
@@ -679,7 +679,7 @@
       "siteId": "site-seed-13",
       "surveyor": "沈宁",
       "date": "2026-06-19",
-      "temperature": 16.0,
+      "temperature": 16,
       "humidity": 94,
       "co2": 760,
       "dripRate": 18,
@@ -755,6 +755,238 @@
           "at": "2026-06-20T09:20:00.000Z",
           "action": "创建",
           "note": "滴水帘东侧正常"
+        }
+      ]
+    },
+    {
+      "id": "surveys-1782012057423-6e463",
+      "siteId": "site-seed-1",
+      "surveyor": "沈宁",
+      "date": "2026-06-20",
+      "temperature": 17.2,
+      "humidity": 88,
+      "co2": 720,
+      "dripRate": 12,
+      "disturbance": "",
+      "photos": [],
+      "status": "正常",
+      "reviewNote": "",
+      "manuallyReviewed": false,
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 1,
+      "deviationHumidity": 4,
+      "deviationCo2": 40,
+      "createdAt": "2026-06-21T03:20:57.423Z",
+      "updatedAt": "2026-06-21T03:20:57.423Z",
+      "history": [
+        {
+          "at": "2026-06-21T03:20:57.423Z",
+          "action": "创建",
+          "note": "批量导入 · 自动判定：正常"
+        }
+      ]
+    },
+    {
+      "id": "surveys-1782012057423-72af4",
+      "siteId": "site-seed-2",
+      "surveyor": "李明",
+      "date": "2026-06-20",
+      "temperature": 18,
+      "humidity": 85,
+      "co2": 560,
+      "dripRate": 0,
+      "disturbance": "",
+      "photos": [],
+      "status": "正常",
+      "reviewNote": "",
+      "manuallyReviewed": false,
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 0.5,
+      "deviationHumidity": 0,
+      "deviationCo2": 10,
+      "createdAt": "2026-06-21T03:20:57.423Z",
+      "updatedAt": "2026-06-21T03:20:57.423Z",
+      "history": [
+        {
+          "at": "2026-06-21T03:20:57.423Z",
+          "action": "创建",
+          "note": "批量导入 · 自动判定：正常"
+        }
+      ]
+    },
+    {
+      "id": "surveys-1782012528058-63963",
+      "siteId": "site-seed-1",
+      "surveyor": "沈宁",
+      "date": "2026-06-20",
+      "temperature": 17.2,
+      "humidity": 88,
+      "co2": 720,
+      "dripRate": 12,
+      "disturbance": "",
+      "photos": [],
+      "status": "正常",
+      "reviewNote": "",
+      "manuallyReviewed": false,
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 1,
+      "deviationHumidity": 4,
+      "deviationCo2": 40,
+      "createdAt": "2026-06-21T03:28:48.058Z",
+      "updatedAt": "2026-06-21T03:28:48.058Z",
+      "history": [
+        {
+          "at": "2026-06-21T03:28:48.059Z",
+          "action": "创建",
+          "note": "批量导入 · 自动判定：正常"
+        }
+      ]
+    },
+    {
+      "id": "surveys-1782012528059-c6275",
+      "siteId": "site-seed-2",
+      "surveyor": "李明",
+      "date": "2026-06-20",
+      "temperature": 18,
+      "humidity": 85,
+      "co2": 560,
+      "dripRate": 0,
+      "disturbance": "",
+      "photos": [],
+      "status": "正常",
+      "reviewNote": "",
+      "manuallyReviewed": false,
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 0.5,
+      "deviationHumidity": 0,
+      "deviationCo2": 10,
+      "createdAt": "2026-06-21T03:28:48.058Z",
+      "updatedAt": "2026-06-21T03:28:48.058Z",
+      "history": [
+        {
+          "at": "2026-06-21T03:28:48.059Z",
+          "action": "创建",
+          "note": "批量导入 · 自动判定：正常"
+        }
+      ]
+    },
+    {
+      "id": "surveys-1782012528059-6d375",
+      "siteId": "site-seed-4",
+      "surveyor": "王芳",
+      "date": "2026-06-20",
+      "temperature": 16.5,
+      "humidity": 93,
+      "co2": 760,
+      "dripRate": 8,
+      "disturbance": "",
+      "photos": [],
+      "status": "正常",
+      "reviewNote": "",
+      "manuallyReviewed": false,
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 0.6999999999999993,
+      "deviationHumidity": 2,
+      "deviationCo2": 40,
+      "createdAt": "2026-06-21T03:28:48.058Z",
+      "updatedAt": "2026-06-21T03:28:48.058Z",
+      "history": [
+        {
+          "at": "2026-06-21T03:28:48.059Z",
+          "action": "创建",
+          "note": "批量导入 · 自动判定：正常"
+        }
+      ]
+    },
+    {
+      "id": "surveys-1782012918665-d7db9",
+      "siteId": "site-seed-1",
+      "surveyor": "沈宁",
+      "date": "2026-06-20",
+      "temperature": 17.2,
+      "humidity": 88,
+      "co2": 720,
+      "dripRate": 12,
+      "disturbance": "",
+      "photos": [],
+      "status": "正常",
+      "reviewNote": "",
+      "manuallyReviewed": false,
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 1,
+      "deviationHumidity": 4,
+      "deviationCo2": 40,
+      "createdAt": "2026-06-21T03:35:18.665Z",
+      "updatedAt": "2026-06-21T03:35:18.665Z",
+      "history": [
+        {
+          "at": "2026-06-21T03:35:18.665Z",
+          "action": "创建",
+          "note": "批量导入 · 自动判定：正常"
+        }
+      ]
+    },
+    {
+      "id": "surveys-1782012918665-5a3cc",
+      "siteId": "site-seed-2",
+      "surveyor": "李明",
+      "date": "2026-06-20",
+      "temperature": 18,
+      "humidity": 85,
+      "co2": 560,
+      "dripRate": 0,
+      "disturbance": "",
+      "photos": [],
+      "status": "正常",
+      "reviewNote": "",
+      "manuallyReviewed": false,
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 0.5,
+      "deviationHumidity": 0,
+      "deviationCo2": 10,
+      "createdAt": "2026-06-21T03:35:18.665Z",
+      "updatedAt": "2026-06-21T03:35:18.665Z",
+      "history": [
+        {
+          "at": "2026-06-21T03:35:18.665Z",
+          "action": "创建",
+          "note": "批量导入 · 自动判定：正常"
+        }
+      ]
+    },
+    {
+      "id": "surveys-1782012918665-a6b8a",
+      "siteId": "site-seed-4",
+      "surveyor": "王芳",
+      "date": "2026-06-20",
+      "temperature": 16.5,
+      "humidity": 93,
+      "co2": 760,
+      "dripRate": 8,
+      "disturbance": "",
+      "photos": [],
+      "status": "正常",
+      "reviewNote": "",
+      "manuallyReviewed": false,
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 0.6999999999999993,
+      "deviationHumidity": 2,
+      "deviationCo2": 40,
+      "createdAt": "2026-06-21T03:35:18.665Z",
+      "updatedAt": "2026-06-21T03:35:18.665Z",
+      "history": [
+        {
+          "at": "2026-06-21T03:35:18.665Z",
+          "action": "创建",
+          "note": "批量导入 · 自动判定：正常"
         }
       ]
     }

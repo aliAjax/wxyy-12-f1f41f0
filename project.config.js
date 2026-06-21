@@ -173,6 +173,14 @@ module.exports = {
       ]
     },
     {
+      id: 'import',
+      label: '批量导入',
+      type: 'import',
+      collection: 'surveys',
+      formTitle: '传感器数据批量导入',
+      listTitle: '导入结果'
+    },
+    {
       id: 'plans',
       label: '巡测计划',
       collection: 'plans',
