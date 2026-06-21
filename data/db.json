@@ -25,26 +25,71 @@
       "createdAt": "2026-06-01T00:00:00.000Z"
     }
   ],
-  "sessions": [
+  "sessions": [],
+  "roles": [
     {
-      "id": "session-1782019456731-9cf12",
-      "token": "sess-1782019456731-7e026d71",
-      "userId": "user-admin-1",
-      "username": "admin",
-      "role": "admin",
-      "name": "张管理",
-      "createdAt": "2026-06-21T05:24:16.731Z",
-      "expiresAt": "2026-06-22T05:24:16.731Z"
+      "id": "role-admin",
+      "code": "admin",
+      "name": "洞穴管理员",
+      "description": "拥有系统完整权限，包括样点、巡测、计划、复查、事件的增删改，以及配置管理和审计回滚",
+      "permissions": [
+        "sites:create",
+        "sites:update",
+        "sites:delete",
+        "sites:suspend",
+        "surveys:create",
+        "surveys:update",
+        "surveys:delete",
+        "surveys:markAbnormal",
+        "surveys:review",
+        "plans:create",
+        "plans:update",
+        "plans:delete",
+        "plans:complete",
+        "reviews:create",
+        "reviews:update",
+        "reviews:delete",
+        "reviews:complete",
+        "incidents:create",
+        "incidents:update",
+        "incidents:delete",
+        "incidents:process",
+        "incidents:suspendSite",
+        "import:surveys",
+        "config:update",
+        "audit:view",
+        "audit:rollback"
+      ],
+      "createdAt": "2026-06-01T00:00:00.000Z"
     },
     {
-      "id": "session-1782018986417-2ed8e",
-      "token": "sess-1782018986417-07220b71",
-      "userId": "user-admin-1",
-      "username": "admin",
-      "role": "admin",
-      "name": "张管理",
-      "createdAt": "2026-06-21T05:16:26.417Z",
-      "expiresAt": "2026-06-22T05:16:26.418Z"
+      "id": "role-surveyor",
+      "code": "surveyor",
+      "name": "巡测员",
+      "description": "负责日常巡测工作，可创建和更新巡测记录、标记异常、创建事件、批量导入数据",
+      "permissions": [
+        "surveys:create",
+        "surveys:update",
+        "surveys:markAbnormal",
+        "incidents:create",
+        "import:surveys",
+        "audit:view"
+      ],
+      "createdAt": "2026-06-01T00:00:00.000Z"
+    },
+    {
+      "id": "role-reviewer",
+      "code": "reviewer",
+      "name": "审核员",
+      "description": "负责异常复查和审核工作，可完成复查、创建和更新复查任务、查看审计日志",
+      "permissions": [
+        "surveys:review",
+        "reviews:create",
+        "reviews:update",
+        "reviews:complete",
+        "audit:view"
+      ],
+      "createdAt": "2026-06-01T00:00:00.000Z"
     }
   ],
   "thresholdRules": {
@@ -838,28 +883,6 @@
           "note": "滴水帘东侧正常"
         }
       ]
-    },
-    {
-      "id": "surveys-1782019029258-ed959",
-      "siteId": "site-1",
-      "temperature": 17.5,
-      "humidity": 85,
-      "co2": 600,
-      "createdAt": "2026-06-21T05:17:09.258Z",
-      "updatedAt": "2026-06-21T05:17:09.258Z",
-      "history": [
-        {
-          "at": "2026-06-21T05:17:09.258Z",
-          "action": "创建",
-          "note": "自动判定：（）"
-        }
-      ],
-      "autoRiskLevel": "",
-      "autoRiskReasons": [],
-      "deviationTemp": 0,
-      "deviationHumidity": 0,
-      "deviationCo2": 0,
-      "manuallyReviewed": false
     }
   ],
   "plans": [

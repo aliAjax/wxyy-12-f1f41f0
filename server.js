@@ -268,6 +268,21 @@ app.patch('/api/:collection/:id', authMiddleware, async (req, res) => {
   delete req.body.operator;
   const thresholdRules = getThresholdRules(db);
   const oldStatus = item.status;
+
+  if (collection === 'surveys' && req.body.status !== undefined && req.body.status !== oldStatus) {
+    const newStatus = req.body.status;
+    if (newStatus === '已复查') {
+      if (!req.user || !auth.hasPermission(req.user.role, 'surveys:review')) {
+        return res.status(403).json({ error: '无权限完成复查' });
+      }
+    }
+    if (newStatus === '异常待复查') {
+      if (!req.user || !auth.hasPermission(req.user.role, 'surveys:markAbnormal')) {
+        return res.status(403).json({ error: '无权限标记异常' });
+      }
+    }
+  }
+
   Object.assign(item, req.body, { updatedAt: new Date().toISOString() });
   if (collection === 'surveys') {
     if (req.body.status && req.body.status !== oldStatus) {
