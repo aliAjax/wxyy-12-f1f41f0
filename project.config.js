@@ -16,6 +16,7 @@ module.exports = {
         'surveys:markAbnormal',
         'surveys:review',
         'plans:create',
+        'plans:createFromZone',
         'plans:update',
         'plans:delete',
         'plans:complete',
@@ -43,6 +44,7 @@ module.exports = {
         'surveys:markAbnormal',
         'plans:view',
         'plans:generateDrafts',
+        'plans:createFromZone',
         'incidents:create',
         'import:surveys',
         'audit:view'
@@ -86,6 +88,11 @@ module.exports = {
         { name: '流石坝区', order: 2, route: '中线巡测' }
       ]
     }
+  },
+  patrolCycle: {
+    '高': 3,
+    '中': 7,
+    '低': 14
   },
   tones: {
     '常规观察': 'ok',

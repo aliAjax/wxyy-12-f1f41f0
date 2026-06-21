@@ -727,12 +727,121 @@ app.get('/api/zone-detail/:cave/:zone', authMiddleware, async (req, res) => {
   const allSurveys = (db.surveys || []).filter((s) => siteIds.includes(s.siteId));
   const sortedSurveys = allSurveys.sort(sortNewest).slice(0, 10);
 
+  const patrolCycle = config.patrolCycle || { '高': 3, '中': 7, '低': 14 };
+  const now = new Date();
+
+  const sitesWithSchedule = sites.map((site) => {
+    const siteSurveys = allSurveys
+      .filter((s) => s.siteId === site.id)
+      .sort(sortNewest);
+    const latestSurvey = siteSurveys[0] || null;
+    const cycleDays = patrolCycle[site.sensitivity] || patrolCycle['低'] || 14;
+    let lastSurveyAt = null;
+    let overdueDays = 0;
+    let isOverdue = false;
+    if (latestSurvey) {
+      lastSurveyAt = latestSurvey.createdAt || latestSurvey.date;
+      const lastDate = new Date(lastSurveyAt);
+      const diffMs = now.getTime() - lastDate.getTime();
+      const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+      overdueDays = diffDays - cycleDays;
+      isOverdue = overdueDays > 0;
+    } else {
+      isOverdue = true;
+      overdueDays = 999;
+    }
+    return {
+      ...site,
+      schedule: {
+        lastSurveyAt,
+        latestRiskLevel: latestSurvey?.autoRiskLevel || '正常',
+        latestSurveyStatus: latestSurvey?.status || '',
+        cycleDays,
+        overdueDays: isOverdue ? overdueDays : 0,
+        isOverdue
+      }
+    };
+  });
+
+  const overdueCount = sitesWithSchedule.filter((s) => s.schedule.isOverdue).length;
+
   res.json({
     cave,
     zone,
-    sites,
-    recentSurveys: sortedSurveys
+    sites: sitesWithSchedule,
+    recentSurveys: sortedSurveys,
+    scheduleSummary: {
+      totalSites: sites.length,
+      overdueCount,
+      onScheduleCount: sites.length - overdueCount
+    }
   });
+});
+
+app.post('/api/zone-create-plan/:cave/:zone', authMiddleware, requirePermission('plans:createFromZone'), async (req, res) => {
+  const db = req.db;
+  const { cave, zone } = req.params;
+  const sites = (db.sites || []).filter((s) => s.cave === cave && s.zone === zone);
+  if (!sites.length) return res.status(404).json({ error: '未找到该分区样点' });
+
+  const patrolCycle = config.patrolCycle || { '高': 3, '中': 7, '低': 14 };
+  const now = new Date();
+  const allSurveys = db.surveys || [];
+
+  const overdueSites = sites.filter((site) => {
+    const siteSurveys = allSurveys
+      .filter((s) => s.siteId === site.id)
+      .sort(sortNewest);
+    const latestSurvey = siteSurveys[0] || null;
+    const cycleDays = patrolCycle[site.sensitivity] || patrolCycle['低'] || 14;
+    if (!latestSurvey) return true;
+    const lastDate = new Date(latestSurvey.createdAt || latestSurvey.date);
+    const diffDays = Math.floor((now.getTime() - lastDate.getTime()) / (24 * 60 * 60 * 1000));
+    return diffDays > cycleDays;
+  });
+
+  if (!overdueSites.length) return res.status(400).json({ error: '该分区无逾期样点，无需创建计划' });
+
+  const zoneLayout = (config.zoneLayout || {})[cave]?.zones?.find((z) => z.name === zone);
+  const route = zoneLayout?.route || overdueSites[0]?.route || '';
+  const operator = req.user ? req.user.name : (req.body?.operator || 'system');
+  const nowISO = new Date().toISOString();
+  const plannedDate = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const plan = {
+    id: `plans-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
+    route,
+    siteIds: overdueSites.map((s) => s.id),
+    siteCount: overdueSites.length,
+    manager: operator,
+    plannedDate,
+    status: '待执行',
+    note: `自动生成：${cave} / ${zone} 逾期样点巡测计划（共 ${overdueSites.length} 个样点）`,
+    autoCreatedFromZone: true,
+    sourceCave: cave,
+    sourceZone: zone,
+    createdAt: nowISO,
+    updatedAt: nowISO,
+    history: [stamp('创建', `由分区巡测排程自动生成，包含 ${overdueSites.length} 个逾期样点`)]
+  };
+
+  if (!db.plans) db.plans = [];
+  db.plans.push(plan);
+
+  audit.createAuditLog({
+    db,
+    collection: 'plans',
+    recordId: plan.id,
+    action: audit.AUDIT_TYPES.CREATE,
+    actionLabel: '创建（自动生成）',
+    before: null,
+    after: plan,
+    note: `分区 ${cave} / ${zone} 一键生成逾期样点巡测计划`,
+    operator
+  });
+
+  await writeDb(db);
+  res.status(201).json(plan);
 });
 
 app.get('/api/incident-stats', authMiddleware, async (req, res) => {

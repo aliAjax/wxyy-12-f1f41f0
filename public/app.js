@@ -1681,7 +1681,31 @@ function renderZoneDetailBody(caveName, zoneName) {
       <span>正在加载分区详情…</span>
     </div>`;
   }
+  const canCreatePlan = hasPermission('plans:createFromZone');
+  const scheduleSummary = detail.scheduleSummary || {};
+  const overdueSites = detail.sites.filter((s) => s.schedule?.isOverdue);
+  const onScheduleSites = detail.sites.filter((s) => !s.schedule?.isOverdue);
+
   return `<div class="zone-detail">
+    <div class="zone-detail-section zone-schedule-section">
+      <h4>巡测排程${scheduleSummary.overdueCount > 0 ? ` · <span class="zone-schedule-overdue-badge">${scheduleSummary.overdueCount} 个逾期</span>` : ''}</h4>
+      ${overdueSites.length > 0 && canCreatePlan ? `
+        <div class="zone-schedule-action">
+          <span class="zone-schedule-action-hint">检测到 ${overdueSites.length} 个样点巡测逾期，可一键生成巡测计划</span>
+          <button class="zone-create-plan-btn" data-zone-cave="${escapeHtml(caveName)}" data-zone-zone="${escapeHtml(zoneName)}" ${overdueSites.length === 0 ? 'disabled' : ''}>一键生成逾期巡测计划</button>
+        </div>
+      ` : ''}
+      ${overdueSites.length > 0 && !canCreatePlan ? `
+        <div class="zone-schedule-action zone-schedule-action-disabled">
+          <span class="zone-schedule-action-hint">检测到 ${overdueSites.length} 个样点巡测逾期，但您无权创建巡测计划</span>
+        </div>
+      ` : ''}
+      <div class="zone-detail-list">
+        ${overdueSites.length ? overdueSites.map((site) => renderScheduleItem(site, true)).join('') : ''}
+        ${onScheduleSites.length ? onScheduleSites.map((site) => renderScheduleItem(site, false)).join('') : ''}
+        ${detail.sites.length === 0 ? '<div class="empty" style="padding:12px">暂无样点</div>' : ''}
+      </div>
+    </div>
     <div class="zone-detail-section">
       <h4>分区样点（${detail.sites.length} 个）</h4>
       <div class="zone-detail-list">
@@ -1732,6 +1756,26 @@ function renderZoneDetailBody(caveName, zoneName) {
         }).join('') : '<div class="empty" style="padding:12px">暂无巡测记录</div>'}
       </div>
     </div>
+  </div>`;
+}
+
+function renderScheduleItem(site, isOverdue) {
+  const schedule = site.schedule || {};
+  const riskTone = schedule.latestRiskLevel === '高风险' ? 'bad' : (schedule.latestRiskLevel === '预警' ? 'warn' : 'ok');
+  const lastSurveyDate = schedule.lastSurveyAt ? new Date(schedule.lastSurveyAt).toLocaleDateString('zh-CN') : '无记录';
+  return `<div class="zone-schedule-item ${isOverdue ? 'overdue' : 'on-schedule'}">
+    <div class="zone-schedule-item-head">
+      <strong class="zone-schedule-point">${escapeHtml(site.pointCode)}</strong>
+      ${isOverdue ? '<span class="pill bad zone-overdue-pill">逾期</span>' : '<span class="pill ok zone-onschedule-pill">正常</span>'}
+      ${schedule.latestRiskLevel && schedule.latestRiskLevel !== '正常' ? pill(schedule.latestRiskLevel, riskTone) : ''}
+    </div>
+    <div class="zone-schedule-item-meta">
+      <span>敏感等级：${escapeHtml(site.sensitivity || '-')}</span>
+      <span>巡测周期：${schedule.cycleDays || '-'} 天</span>
+      <span>最近巡测：${lastSurveyDate}</span>
+      ${isOverdue ? `<span class="zone-overdue-days">逾期 ${schedule.overdueDays === 999 ? '从未巡测' : schedule.overdueDays + ' 天'}</span>` : ''}
+    </div>
+    ${schedule.latestSurveyStatus === '异常待复查' ? '<div class="zone-schedule-item-alert">当前状态：异常待复查</div>' : ''}
   </div>`;
 }
 
@@ -2111,6 +2155,36 @@ async function toggleZoneDetail(cardEl) {
   }
 }
 
+async function createOverduePlan(caveName, zoneName, btnEl) {
+  if (!hasPermission('plans:createFromZone')) {
+    toast('您无权创建巡测计划');
+    return;
+  }
+  if (!btnEl) return;
+  btnEl.disabled = true;
+  btnEl.textContent = '正在生成…';
+  try {
+    const plan = await api(`/api/zone-create-plan/${encodeURIComponent(caveName)}/${encodeURIComponent(zoneName)}`, {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+    toast(`已创建巡测计划：${plan.note || '逾期样点巡测计划'}`);
+    delete state.zoneDetailCache[`${caveName}||${zoneName}`];
+    await load();
+    const cardEl = document.querySelector(`.zone-card[data-zone="${CSS.escape(caveName)}"][data-zone-name="${CSS.escape(zoneName)}"]`);
+    if (cardEl && cardEl.classList.contains('is-open')) {
+      await loadZoneDetail(caveName, zoneName);
+      const oldDetail = cardEl.querySelector(':scope > .zone-detail');
+      if (oldDetail) oldDetail.remove();
+      cardEl.insertAdjacentHTML('beforeend', renderZoneDetailBody(caveName, zoneName));
+    }
+  } catch (err) {
+    toast(`创建计划失败：${err.message}`);
+    btnEl.disabled = false;
+    btnEl.textContent = '一键生成逾期巡测计划';
+  }
+}
+
 async function previewImport() {
   const csvText = $('#importCsvText')?.value.trim();
   if (!csvText) {
@@ -2193,6 +2267,13 @@ document.addEventListener('click', async (event) => {
   if (zoneCard && !event.target.closest('.zone-detail') && !event.target.closest('.zone-detail-loading')) {
     event.preventDefault();
     await toggleZoneDetail(zoneCard);
+    return;
+  }
+  const createPlanBtn = event.target.closest('.zone-create-plan-btn');
+  if (createPlanBtn) {
+    event.preventDefault();
+    event.stopPropagation();
+    await createOverduePlan(createPlanBtn.dataset.zoneCave, createPlanBtn.dataset.zoneZone, createPlanBtn);
     return;
   }
   if (planGenerateDraftsBtn) {
