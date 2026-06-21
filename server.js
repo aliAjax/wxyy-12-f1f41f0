@@ -696,6 +696,17 @@ app.post('/api/surveys/import', async (req, res) => {
     };
 
     db.surveys.push(item);
+    audit.createAuditLog({
+      db,
+      collection: 'surveys',
+      recordId: item.id,
+      action: audit.AUDIT_TYPES.CREATE,
+      actionLabel: '批量导入',
+      before: null,
+      after: item,
+      note: `批量导入 · ${riskNote}`,
+      operator: req.body?.operator || normalized.surveyor || '批量导入'
+    });
     successItems.push({
       lineNumber: row.lineNumber,
       id: item.id,

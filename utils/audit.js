@@ -76,7 +76,7 @@ function rollbackToAuditLog(db, logId, note, operator) {
   if (!currentRecord) {
     return { error: '当前记录不存在，无法回滚' };
   }
-  const rollbackTarget = log.action === AUDIT_TYPES.CREATE ? log.after : log.before;
+  const rollbackTarget = log.after;
   if (!rollbackTarget) {
     return { error: '目标版本数据不存在' };
   }
@@ -92,7 +92,7 @@ function rollbackToAuditLog(db, logId, note, operator) {
     }
   }
   currentRecord.updatedAt = new Date().toISOString();
-  const rollbackNote = note || `回滚至 ${log.actionLabel} (${log.createdAt})`;
+  const rollbackNote = note || `恢复到「${log.actionLabel}」(${log.createdAt}) 操作完成后的状态`;
   if (!currentRecord.history) currentRecord.history = [];
   currentRecord.history.unshift({
     at: currentRecord.updatedAt,
@@ -107,7 +107,7 @@ function rollbackToAuditLog(db, logId, note, operator) {
     actionLabel: '回滚',
     before: beforeRollback,
     after: deepClone(currentRecord),
-    note: `${rollbackNote}，源审计记录：${logId}`,
+    note: `${rollbackNote}，源审计记录：${logId}（${log.actionLabel}）`,
     operator
   });
   return { item: currentRecord, auditLog, sourceLog: log };

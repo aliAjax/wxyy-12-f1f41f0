@@ -364,7 +364,7 @@ function renderAuditTimeline(logs, collection, id) {
     return `<div class="empty" style="padding:40px;text-align:center;">暂无审计记录</div>`;
   }
   const currentItem = state.db[collection]?.find((entry) => entry.id === id);
-  const rollbackNote = currentItem ? `确认回滚至该版本？此操作将生成新的审计记录。` : '';
+  const rollbackNote = currentItem ? `确认将记录恢复到本次操作完成后的状态？此操作将生成新的审计记录。` : '';
   return `
     <div class="audit-timeline">
       ${logs.map((log, index) => {
@@ -404,7 +404,7 @@ function renderAuditTimeline(logs, collection, id) {
               ` : ''}
               <div class="audit-timeline-actions">
                 <button class="secondary" data-view-diff="${log.id}">查看详细差异</button>
-                ${canRollback ? `<button class="danger" data-rollback="${log.id}" data-rollback-note="${escapeHtml(rollbackNote)}">回滚到此版本</button>` : ''}
+                ${canRollback ? `<button class="danger" data-rollback="${log.id}" data-rollback-note="${escapeHtml(rollbackNote)}">恢复到此状态</button>` : ''}
               </div>
             </div>
           </div>
@@ -472,7 +472,7 @@ function renderDiffView(log) {
 async function rollbackToLog(logId) {
   const log = state.auditLogs.find((l) => l.id === logId);
   if (!log) return;
-  const note = prompt(`回滚备注（可选）：\n\n将回滚至「${log.actionLabel}」(${fmtDate(log.createdAt)})\n确认后将生成新的审计记录。`, '');
+  const note = prompt(`回滚备注（可选）：\n\n将记录恢复到「${log.actionLabel}」(${fmtDate(log.createdAt)}) 操作完成后的状态\n确认后将生成新的审计记录。`, '');
   if (note === null) return;
   try {
     const result = await api(`/api/audit-logs/${logId}/rollback`, {
@@ -1393,7 +1393,7 @@ document.addEventListener('click', async (event) => {
   if (rollbackBtn) {
     const logId = rollbackBtn.dataset.rollback;
     const note = rollbackBtn.dataset.rollbackNote || '';
-    if (confirm(note || '确认回滚到此版本？')) {
+    if (confirm(note || '确认将记录恢复到本次操作完成后的状态？')) {
       await rollbackToLog(logId);
     }
   }
