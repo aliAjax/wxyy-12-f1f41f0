@@ -16,7 +16,8 @@ const state = {
   activeDiffLog: null,
   currentUser: null,
   authToken: null,
-  listFilters: {}
+  listFilters: {},
+  creatingPlanZoneKey: null
 };
 
 const TOKEN_STORAGE_KEY = 'wxyy_auth_token_v1';
@@ -1692,7 +1693,7 @@ function renderZoneDetailBody(caveName, zoneName) {
       ${overdueSites.length > 0 && canCreatePlan ? `
         <div class="zone-schedule-action">
           <span class="zone-schedule-action-hint">检测到 ${overdueSites.length} 个样点巡测逾期，可一键生成巡测计划</span>
-          <button class="zone-create-plan-btn" data-zone-cave="${escapeHtml(caveName)}" data-zone-zone="${escapeHtml(zoneName)}" ${overdueSites.length === 0 ? 'disabled' : ''}>一键生成逾期巡测计划</button>
+          <button class="zone-create-plan-btn" data-zone-cave="${escapeHtml(caveName)}" data-zone-zone="${escapeHtml(zoneName)}" ${overdueSites.length === 0 || state.creatingPlanZoneKey === `${caveName}||${zoneName}` ? 'disabled' : ''}>${state.creatingPlanZoneKey === `${caveName}||${zoneName}` ? '正在生成…' : '一键生成逾期巡测计划'}</button>
         </div>
       ` : ''}
       ${overdueSites.length > 0 && !canCreatePlan ? `
@@ -2160,16 +2161,17 @@ async function createOverduePlan(caveName, zoneName, btnEl) {
     toast('您无权创建巡测计划');
     return;
   }
-  if (!btnEl) return;
-  btnEl.disabled = true;
-  btnEl.textContent = '正在生成…';
+  const zoneKey = `${caveName}||${zoneName}`;
+  if (state.creatingPlanZoneKey === zoneKey) return;
+  state.creatingPlanZoneKey = zoneKey;
+  refreshZoneDetailButton(caveName, zoneName);
   try {
     const plan = await api(`/api/zone-create-plan/${encodeURIComponent(caveName)}/${encodeURIComponent(zoneName)}`, {
       method: 'POST',
       body: JSON.stringify({})
     });
     toast(`已创建巡测计划：${plan.note || '逾期样点巡测计划'}`);
-    delete state.zoneDetailCache[`${caveName}||${zoneName}`];
+    delete state.zoneDetailCache[zoneKey];
     await load();
     const cardEl = document.querySelector(`.zone-card[data-zone="${CSS.escape(caveName)}"][data-zone-name="${CSS.escape(zoneName)}"]`);
     if (cardEl && cardEl.classList.contains('is-open')) {
@@ -2180,9 +2182,21 @@ async function createOverduePlan(caveName, zoneName, btnEl) {
     }
   } catch (err) {
     toast(`创建计划失败：${err.message}`);
-    btnEl.disabled = false;
-    btnEl.textContent = '一键生成逾期巡测计划';
+  } finally {
+    state.creatingPlanZoneKey = null;
+    refreshZoneDetailButton(caveName, zoneName);
   }
+}
+
+function refreshZoneDetailButton(caveName, zoneName) {
+  const btn = document.querySelector(
+    `.zone-create-plan-btn[data-zone-cave="${CSS.escape(caveName)}"][data-zone-zone="${CSS.escape(zoneName)}"]`
+  );
+  if (!btn) return;
+  const zoneKey = `${caveName}||${zoneName}`;
+  const isCreating = state.creatingPlanZoneKey === zoneKey;
+  btn.disabled = isCreating;
+  btn.textContent = isCreating ? '正在生成…' : '一键生成逾期巡测计划';
 }
 
 async function previewImport() {
