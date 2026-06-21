@@ -11,8 +11,12 @@ const state = {
   importResultData: null,
   auditLogs: [],
   activeAuditRecord: null,
-  activeDiffLog: null
+  activeDiffLog: null,
+  currentUser: null,
+  authToken: null
 };
+
+const TOKEN_STORAGE_KEY = 'wxyy_auth_token_v1';
 
 const DRAFT_STORAGE_KEY = 'wxyy_survey_drafts_v1';
 
@@ -106,16 +110,64 @@ function toast(message) {
 }
 
 async function api(path, options = {}) {
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  if (state.authToken) {
+    headers['Authorization'] = `Bearer ${state.authToken}`;
+  }
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options
+    ...options,
+    headers
   });
+  if (res.status === 401) {
+    state.currentUser = null;
+    state.authToken = null;
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    renderHeaderUser();
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || '请求失败');
   }
   if (res.status === 204) return null;
   return res.json();
+}
+
+function hasPermission(permission) {
+  if (!state.currentUser || !state.config?.roles) return false;
+  const roleConfig = state.config.roles[state.currentUser.role];
+  if (!roleConfig) return false;
+  return roleConfig.permissions?.includes(permission) || false;
+}
+
+function actionPermissionMap(actionId) {
+  const map = {
+    'site-normal': 'sites:update',
+    'site-focus': 'sites:update',
+    'site-close': 'sites:suspend',
+    'survey-alert': 'surveys:markAbnormal',
+    'survey-review': 'surveys:review',
+    'plan-complete': 'plans:complete',
+    'plan-reopen': 'plans:update',
+    'review-complete': 'reviews:complete',
+    'incident-processing': 'incidents:process',
+    'incident-resolve': 'incidents:process',
+    'incident-close': 'incidents:process',
+    'incident-reopen': 'incidents:process',
+    'incident-suspend-site': 'incidents:suspendSite'
+  };
+  return map[actionId] || null;
+}
+
+function canCreateCollection(collection) {
+  const permissionMap = {
+    sites: 'sites:create',
+    surveys: 'surveys:create',
+    plans: 'plans:create',
+    reviews: 'reviews:create',
+    incidents: 'incidents:create'
+  };
+  const perm = permissionMap[collection];
+  return perm ? hasPermission(perm) : false;
 }
 
 function valueByPath(source, pathName) {
@@ -625,9 +677,17 @@ function renderCard(item, collection, view) {
   const summary = (view.summaryFields || []).map((field) => item[field]).filter(Boolean).join(' · ');
   const actions = state.config.actions
     .filter((action) => action.collection === collection)
-    .map((action) => `<button class="${action.danger ? 'danger' : 'ghost'}" data-action="${action.id}" data-id="${item.id}">${escapeHtml(action.label)}</button>`)
+    .map((action) => {
+      const perm = actionPermissionMap(action.id);
+      const disabled = perm ? !hasPermission(perm) : false;
+      const title = disabled ? '无权限执行此操作' : '';
+      return `<button class="${action.danger ? 'danger' : 'ghost'}" data-action="${action.id}" data-id="${item.id}" ${disabled ? 'disabled title="无权限执行此操作"' : ''}>${escapeHtml(action.label)}</button>`;
+    })
     .join('');
-  const auditBtn = `<button class="ghost" data-audit-history="${collection}:${item.id}" data-audit-title="${escapeHtml(title)}">📋 审计历史</button>`;
+  const canViewAudit = hasPermission('audit:view');
+  const auditBtn = canViewAudit
+    ? `<button class="ghost" data-audit-history="${collection}:${item.id}" data-audit-title="${escapeHtml(title)}">📋 审计历史</button>`
+    : '';
   return `<article class="card">
     <div class="card-head"><h3>${escapeHtml(title)}</h3><div class="card-head-right">${statusValue ? pill(statusValue, toneFor(statusValue)) : ''}${photosBadgeHtml(item, collection)}</div></div>
     ${relation}
@@ -866,18 +926,20 @@ function renderDashboardView(view) {
 
 function renderConfigView(view) {
   const rules = state.config.thresholdRules || {};
+  const canUpdate = hasPermission('config:update');
   const fieldsHtml = view.thresholdFields.map((field) => {
     const value = valueByPath(rules, field.name);
     const required = field.required ? 'required' : '';
-    return `<label class="${field.wide ? 'wide' : ''}">${field.label}<input type="${field.type || 'number'}" name="${field.name}" value="${escapeHtml(value)}" ${required}></label>`;
+    return `<label class="${field.wide ? 'wide' : ''}">${field.label}<input type="${field.type || 'number'}" name="${field.name}" value="${escapeHtml(value)}" ${required} ${!canUpdate ? 'disabled' : ''}></label>`;
   }).join('');
   return `<section class="view" id="${view.id}">
     <div class="grid single">
-      <form class="panel" data-config-thresholds data-view="${view.id}">
-        <h2>${escapeHtml(view.formTitle)}</h2>
+      <form class="panel ${!canUpdate ? 'form-disabled' : ''}" data-config-thresholds data-view="${view.id}" ${!canUpdate ? 'onsubmit="return false"' : ''}>
+        <h2>${escapeHtml(view.formTitle)}${!canUpdate ? ' <span class="pill warn" title="无权限修改">无权限</span>' : ''}</h2>
         <p class="config-desc">设置各环境参数的预警和高风险偏差阈值。当巡测实测值与样点基准值的偏差达到对应阈值时，系统将自动判定风险等级。</p>
         <div class="form-grid">${fieldsHtml}</div>
-        <div class="actions"><button>${escapeHtml(view.submitLabel || '保存')}</button></div>
+        <div class="actions"><button type="submit" ${!canUpdate ? 'disabled title="无权限修改配置"' : ''}>${escapeHtml(view.submitLabel || '保存')}</button></div>
+        ${!canUpdate ? '<p class="form-disabled-hint">您当前角色无权限修改阈值配置，请联系管理员。</p>' : ''}
       </form>
     </div>
   </section>`;
@@ -888,18 +950,24 @@ function renderCrudView(view) {
   const filterOptions = view.filterField ? [...new Set((state.db[view.collection] || []).map((item) => item[view.filterField]).filter(Boolean))] : [];
   const typeFilterOptions = view.typeFilterOptions || (view.typeFilterField ? [...new Set((state.db[view.collection] || []).map((item) => item[view.typeFilterField]).filter(Boolean))] : []);
   const isSurveyView = view.collection === 'surveys';
+  const canCreate = canCreateCollection(view.collection);
   const draftActions = isSurveyView
-    ? `<button type="button" class="ghost" data-save-draft>保存草稿（离线暂存）</button>`
+    ? `<button type="button" class="ghost" data-save-draft ${!state.currentUser ? 'disabled title="请先登录"' : ''}>保存草稿（离线暂存）</button>`
     : '';
   const submitLabel = isSurveyView && state.editingDraftId ? '更新草稿并提交入库' : (view.submitLabel || '保存');
   const hasExtraFilters = view.filterField || view.typeFilterField;
   const toolbarClass = hasExtraFilters ? 'toolbar toolbar-wide' : 'toolbar';
+  const formDisabled = !canCreate;
   return `<section class="view" id="${view.id}">
     <div class="grid">
-      <form class="panel" data-create="${view.collection}" data-view="${view.id}">
-        <h2>${escapeHtml(view.formTitle)}${isSurveyView && state.editingDraftId ? ' <span class="pill draft-pill">编辑草稿中</span>' : ''}</h2>
+      <form class="panel ${formDisabled ? 'form-disabled' : ''}" data-create="${view.collection}" data-view="${view.id}" ${formDisabled ? 'onsubmit="return false"' : ''}>
+        <h2>${escapeHtml(view.formTitle)}${isSurveyView && state.editingDraftId ? ' <span class="pill draft-pill">编辑草稿中</span>' : ''}${formDisabled ? ' <span class="pill warn" title="无权限创建">无权限</span>' : ''}</h2>
         <div class="form-grid">${view.fields.map(formField).join('')}</div>
-        <div class="actions"><button>${escapeHtml(submitLabel)}</button>${draftActions}</div>
+        <div class="actions">
+          <button type="submit" ${formDisabled ? 'disabled title="无权限创建此类型记录"' : ''}>${escapeHtml(submitLabel)}</button>
+          ${draftActions}
+        </div>
+        ${formDisabled ? '<p class="form-disabled-hint">您当前角色无权限创建此类型记录，请联系管理员。</p>' : ''}
       </form>
       <div class="panel">
         <h2>${escapeHtml(view.listTitle)} <span class="muted-text">（已入库记录）</span></h2>
@@ -1150,12 +1218,13 @@ function renderImportView(view) {
     `;
   }
 
-  const submitDisabled = !previewData || previewData.valid === 0;
+  const canImport = hasPermission('import:surveys');
+  const submitDisabled = !previewData || previewData.valid === 0 || !canImport;
 
   return `<section class="view" id="${view.id}">
     <div class="grid single">
-      <div class="panel import-panel">
-        <h2>${escapeHtml(view.formTitle)}</h2>
+      <div class="panel import-panel ${!canImport ? 'form-disabled' : ''}">
+        <h2>${escapeHtml(view.formTitle)}${!canImport ? ' <span class="pill warn" title="无权限导入">无权限</span>' : ''}</h2>
         <p class="config-desc">将传感器导出的 CSV 数据粘贴到下方文本框，系统将自动解析并校验样点编号和数据格式。校验通过后可批量写入巡测记录。</p>
         <div class="import-format-hint">
           <strong>CSV格式说明：</strong>
@@ -1214,10 +1283,96 @@ async function loadZoneDetail(caveName, zoneName) {
   return detail;
 }
 
+function renderHeaderUser() {
+  const el = $('#userInfo');
+  if (!el) return;
+  if (state.currentUser) {
+    el.innerHTML = `
+      <div class="user-info-inner">
+        <span class="user-name">${escapeHtml(state.currentUser.name)}</span>
+        <span class="user-role pill">${escapeHtml(state.currentUser.roleLabel)}</span>
+        <button class="ghost" id="logoutBtn">退出</button>
+      </div>
+    `;
+  } else {
+    el.innerHTML = `
+      <div class="user-info-inner">
+        <span class="user-guest">未登录</span>
+        <button id="loginBtn">登录</button>
+      </div>
+    `;
+  }
+}
+
+function openLoginModal() {
+  $('#loginModal').classList.add('show');
+  const form = $('#loginForm');
+  if (form) form.reset();
+}
+
+function closeLoginModal() {
+  $('#loginModal').classList.remove('show');
+}
+
+async function doLogin(username, password) {
+  try {
+    const result = await api('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password })
+    });
+    state.currentUser = result.user;
+    state.authToken = result.token;
+    localStorage.setItem(TOKEN_STORAGE_KEY, result.token);
+    renderHeaderUser();
+    await load();
+    closeLoginModal();
+    toast(`登录成功，欢迎 ${result.user.name}`);
+    return true;
+  } catch (err) {
+    toast(err.message);
+    return false;
+  }
+}
+
+async function doLogout() {
+  try {
+    await api('/api/auth/logout', { method: 'POST' });
+  } catch (e) {
+    // 忽略退出时的错误
+  }
+  state.currentUser = null;
+  state.authToken = null;
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+  render();
+  toast('已退出登录');
+}
+
+async function loadCurrentUser() {
+  const savedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+  if (!savedToken) return null;
+  state.authToken = savedToken;
+  try {
+    const user = await api('/api/auth/me');
+    if (user) {
+      state.currentUser = user;
+      renderHeaderUser();
+      return user;
+    }
+  } catch (e) {
+    // token 无效，清除
+  }
+  state.authToken = null;
+  state.currentUser = null;
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+  renderHeaderUser();
+  return null;
+}
+
 function render() {
   $('#title').textContent = state.config.title;
   document.title = state.config.title;
   $('#lede').textContent = state.config.lede;
+  renderHeaderUser();
   const viewsHtml = state.config.views.map((view) => {
     if (view.type === 'dashboard') return renderDashboardView(view);
     if (view.type === 'config') return renderConfigView(view);
@@ -1562,11 +1717,34 @@ document.addEventListener('submit', async (event) => {
 
 $('#refreshBtn').addEventListener('click', () => load().then(() => toast('已刷新')));
 
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'loginBtn' || e.target.closest('#loginBtn')) {
+    openLoginModal();
+  }
+  if (e.target.id === 'logoutBtn' || e.target.closest('#logoutBtn')) {
+    doLogout();
+  }
+  if (e.target.hasAttribute('data-close-login') || e.target.closest('[data-close-login]')) {
+    closeLoginModal();
+  }
+});
+
+$('#loginForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const username = form.username.value.trim();
+  const password = form.password.value;
+  if (username && password) {
+    await doLogin(username, password);
+  }
+});
+
 document.addEventListener('keydown', async (event) => {
   if (event.key === 'Escape') {
     closePhotoModal();
     closeAuditModal();
     closeDiffModal();
+    closeLoginModal();
   }
   const zoneCard = event.target.closest('.zone-card');
   if (zoneCard && (event.key === 'Enter' || event.key === ' ')) {
@@ -1580,6 +1758,7 @@ document.addEventListener('keydown', async (event) => {
 async function boot() {
   state.config = await api('/api/config');
   renderTabs();
+  await loadCurrentUser();
   await load();
 }
 

@@ -2,6 +2,63 @@ module.exports = {
   port: 3912,
   title: '钟乳石洞穴微环境巡测',
   lede: '围绕洞穴、分区、样点和巡测路线记录微环境数据，发现异常后生成复查闭环。',
+  roles: {
+    admin: {
+      label: '洞穴管理员',
+      permissions: [
+        'sites:create',
+        'sites:update',
+        'sites:delete',
+        'sites:suspend',
+        'surveys:create',
+        'surveys:update',
+        'surveys:delete',
+        'surveys:markAbnormal',
+        'surveys:review',
+        'plans:create',
+        'plans:update',
+        'plans:delete',
+        'plans:complete',
+        'reviews:create',
+        'reviews:update',
+        'reviews:delete',
+        'reviews:complete',
+        'incidents:create',
+        'incidents:update',
+        'incidents:delete',
+        'incidents:process',
+        'incidents:suspendSite',
+        'import:surveys',
+        'config:update',
+        'audit:view',
+        'audit:rollback'
+      ]
+    },
+    surveyor: {
+      label: '巡测员',
+      permissions: [
+        'surveys:create',
+        'surveys:update',
+        'surveys:markAbnormal',
+        'plans:view',
+        'incidents:create',
+        'import:surveys',
+        'audit:view'
+      ]
+    },
+    reviewer: {
+      label: '审核员',
+      permissions: [
+        'surveys:view',
+        'surveys:review',
+        'reviews:create',
+        'reviews:update',
+        'reviews:complete',
+        'incidents:view',
+        'audit:view'
+      ]
+    }
+  },
   zoneLayout: {
     '北麓三号洞': {
       order: 1,

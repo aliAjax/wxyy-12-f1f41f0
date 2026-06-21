@@ -5,6 +5,7 @@ const path = require('path');
 const app = express();
 const config = require('./project.config');
 const audit = require('./utils/audit');
+const auth = require('./utils/auth');
 const PORT = process.env.PORT || config.port || 3900;
 const DB_FILE = path.join(__dirname, 'data', 'db.json');
 
@@ -45,16 +46,80 @@ function getThresholdRules(db) {
   return result;
 }
 
-app.get('/api/config', async (req, res) => {
+async function authMiddleware(req, res, next) {
   const db = await readDb();
+  const user = auth.getUserFromRequest(db, req);
+  req.user = user;
+  req.db = db;
+  next();
+}
+
+function requireAuth(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: '请先登录' });
+  }
+  next();
+}
+
+function requirePermission(permission) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: '请先登录' });
+    }
+    if (!auth.hasPermission(req.user.role, permission)) {
+      return res.status(403).json({ error: `无权限执行此操作` });
+    }
+    next();
+  };
+}
+
+app.get('/api/auth/me', authMiddleware, (req, res) => {
+  if (req.user) {
+    res.json(auth.sanitizeUser(req.user));
+  } else {
+    res.json(null);
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: '用户名和密码不能为空' });
+  }
+  const db = await readDb();
+  const user = auth.findUserByUsername(db, username);
+  if (!user || user.password !== password) {
+    return res.status(401).json({ error: '用户名或密码错误' });
+  }
+  const session = auth.createSession(db, user);
+  await writeDb(db);
+  res.json({
+    user: auth.sanitizeUser(user),
+    token: session.token
+  });
+});
+
+app.post('/api/auth/logout', authMiddleware, async (req, res) => {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (token) {
+    const db = await readDb();
+    auth.destroySession(db, token);
+    await writeDb(db);
+  }
+  res.json({ success: true });
+});
+
+app.get('/api/config', authMiddleware, async (req, res) => {
+  const db = req.db;
   const thresholdRules = getThresholdRules(db);
   res.json({ ...config, thresholdRules });
 });
 
-app.patch('/api/config/thresholdRules', async (req, res) => {
+app.patch('/api/config/thresholdRules', authMiddleware, requirePermission('config:update'), async (req, res) => {
   const newRules = req.body;
   if (!newRules || typeof newRules !== 'object') return res.status(400).json({ error: 'invalid rules' });
-  const db = await readDb();
+  const db = req.db;
   db.thresholdRules = db.thresholdRules || {};
   for (const key of ['temperature', 'humidity', 'co2']) {
     if (newRules[key]) {
@@ -68,8 +133,8 @@ app.patch('/api/config/thresholdRules', async (req, res) => {
   res.json(config.thresholdRules);
 });
 
-app.get('/api/db', async (req, res) => {
-  const db = await readDb();
+app.get('/api/db', authMiddleware, async (req, res) => {
+  const db = req.db;
   for (const key of Object.keys(db)) {
     if (Array.isArray(db[key])) db[key].sort(sortNewest);
   }
@@ -111,9 +176,23 @@ function computeAutoRisk(survey, site, rules) {
   return { autoRiskLevel: level || '正常', autoRiskReasons: reasons, deviationTemp, deviationHumidity, deviationCo2 };
 }
 
-app.post('/api/:collection', async (req, res) => {
-  const db = await readDb();
+app.post('/api/:collection', authMiddleware, async (req, res) => {
   const { collection } = req.params;
+  const permissionMap = {
+    sites: 'sites:create',
+    surveys: 'surveys:create',
+    plans: 'plans:create',
+    reviews: 'reviews:create',
+    incidents: 'incidents:create'
+  };
+  const requiredPermission = permissionMap[collection];
+  if (requiredPermission && !req.user) {
+    return res.status(401).json({ error: '请先登录' });
+  }
+  if (requiredPermission && req.user && !auth.hasPermission(req.user.role, requiredPermission)) {
+    return res.status(403).json({ error: '无权限创建此类型记录' });
+  }
+  const db = req.db;
   if (!Array.isArray(db[collection])) return res.status(404).json({ error: 'unknown collection' });
   if (collection === 'incidents') {
     const siteId = req.body.siteId;
@@ -121,6 +200,7 @@ app.post('/api/:collection', async (req, res) => {
     const siteExists = db.sites?.some((s) => s.id === siteId);
     if (!siteExists) return res.status(400).json({ error: '关联样点不存在，无法创建事件' });
   }
+  const operator = req.user ? req.user.name : (req.body.operator || req.headers['x-operator'] || 'system');
   const now = new Date().toISOString();
   const thresholdRules = getThresholdRules(db);
   const item = {
@@ -154,22 +234,36 @@ app.post('/api/:collection', async (req, res) => {
     before: null,
     after: item,
     note: req.body.note || req.body.memo || '',
-    operator: req.body.operator || req.headers['x-operator'] || 'system'
+    operator
   });
   db[collection].push(item);
   await writeDb(db);
   res.status(201).json(item);
 });
 
-app.patch('/api/:collection/:id', async (req, res) => {
-  const db = await readDb();
+app.patch('/api/:collection/:id', authMiddleware, async (req, res) => {
   const { collection, id } = req.params;
+  const permissionMap = {
+    sites: 'sites:update',
+    surveys: 'surveys:update',
+    plans: 'plans:update',
+    reviews: 'reviews:update',
+    incidents: 'incidents:update'
+  };
+  const requiredPermission = permissionMap[collection];
+  if (requiredPermission && !req.user) {
+    return res.status(401).json({ error: '请先登录' });
+  }
+  if (requiredPermission && req.user && !auth.hasPermission(req.user.role, requiredPermission)) {
+    return res.status(403).json({ error: '无权限更新此类型记录' });
+  }
+  const db = req.db;
   if (!Array.isArray(db[collection])) return res.status(404).json({ error: 'unknown collection' });
   const item = db[collection].find((entry) => entry.id === id);
   if (!item) return res.status(404).json({ error: 'not found' });
   const beforeUpdate = JSON.parse(JSON.stringify(item));
   const historyAction = req.body.historyAction;
-  const operator = req.body.operator || req.headers['x-operator'] || 'system';
+  const operator = req.user ? req.user.name : (req.body.operator || req.headers['x-operator'] || 'system');
   delete req.body.historyAction;
   delete req.body.operator;
   const thresholdRules = getThresholdRules(db);
@@ -213,9 +307,23 @@ app.patch('/api/:collection/:id', async (req, res) => {
   res.json(item);
 });
 
-app.delete('/api/:collection/:id', async (req, res) => {
-  const db = await readDb();
+app.delete('/api/:collection/:id', authMiddleware, async (req, res) => {
   const { collection, id } = req.params;
+  const permissionMap = {
+    sites: 'sites:delete',
+    surveys: 'surveys:delete',
+    plans: 'plans:delete',
+    reviews: 'reviews:delete',
+    incidents: 'incidents:delete'
+  };
+  const requiredPermission = permissionMap[collection];
+  if (requiredPermission && !req.user) {
+    return res.status(401).json({ error: '请先登录' });
+  }
+  if (requiredPermission && req.user && !auth.hasPermission(req.user.role, requiredPermission)) {
+    return res.status(403).json({ error: '无权限删除此类型记录' });
+  }
+  const db = req.db;
   if (!Array.isArray(db[collection])) return res.status(404).json({ error: 'unknown collection' });
   const item = db[collection].find((entry) => entry.id === id);
   if (!item) return res.status(404).json({ error: 'not found' });
@@ -223,6 +331,7 @@ app.delete('/api/:collection/:id', async (req, res) => {
   const before = db[collection].length;
   db[collection] = db[collection].filter((entry) => entry.id !== id);
   if (db[collection].length === before) return res.status(404).json({ error: 'not found' });
+  const operator = req.user ? req.user.name : (req.body?.operator || req.headers['x-operator'] || 'system');
   audit.createAuditLog({
     db,
     collection,
@@ -232,19 +341,42 @@ app.delete('/api/:collection/:id', async (req, res) => {
     before: beforeDelete,
     after: null,
     note: req.body?.note || '',
-    operator: req.body?.operator || req.headers['x-operator'] || 'system'
+    operator
   });
   await writeDb(db);
   res.status(204).end();
 });
 
-app.post('/api/action/:actionId/:id', async (req, res) => {
-  const db = await readDb();
-  const action = config.actions.find((entry) => entry.id === req.params.actionId);
+app.post('/api/action/:actionId/:id', authMiddleware, async (req, res) => {
+  const { actionId } = req.params;
+  const actionPermissionMap = {
+    'site-normal': 'sites:update',
+    'site-focus': 'sites:update',
+    'site-close': 'sites:suspend',
+    'survey-alert': 'surveys:markAbnormal',
+    'survey-review': 'surveys:review',
+    'plan-complete': 'plans:complete',
+    'plan-reopen': 'plans:update',
+    'review-complete': 'reviews:complete',
+    'incident-processing': 'incidents:process',
+    'incident-resolve': 'incidents:process',
+    'incident-close': 'incidents:process',
+    'incident-reopen': 'incidents:process',
+    'incident-suspend-site': 'incidents:suspendSite'
+  };
+  const requiredPermission = actionPermissionMap[actionId];
+  if (requiredPermission && !req.user) {
+    return res.status(401).json({ error: '请先登录' });
+  }
+  if (requiredPermission && req.user && !auth.hasPermission(req.user.role, requiredPermission)) {
+    return res.status(403).json({ error: '无权限执行此操作' });
+  }
+  const db = req.db;
+  const action = config.actions.find((entry) => entry.id === actionId);
   if (!action) return res.status(404).json({ error: 'unknown action' });
   const item = db[action.collection]?.find((entry) => entry.id === req.params.id);
   if (!item) return res.status(404).json({ error: 'not found' });
-  const operator = req.body?.operator || req.headers['x-operator'] || 'system';
+  const operator = req.user ? req.user.name : (req.body?.operator || req.headers['x-operator'] || 'system');
   const note = req.body?.note || '';
   const result = runAction(db, action, item, operator, note);
   if (result.error) return res.status(409).json({ error: result.error });
@@ -351,8 +483,8 @@ function getLatestSurvey(surveys, siteId) {
   return siteSurveys.sort(sortNewest)[0];
 }
 
-app.get('/api/zone-overview', async (req, res) => {
-  const db = await readDb();
+app.get('/api/zone-overview', authMiddleware, async (req, res) => {
+  const db = req.db;
   const sites = db.sites || [];
   const surveys = db.surveys || [];
   const layout = config.zoneLayout || {};
@@ -417,8 +549,8 @@ app.get('/api/zone-overview', async (req, res) => {
   res.json({ caves: caveList });
 });
 
-app.get('/api/zone-detail/:cave/:zone', async (req, res) => {
-  const db = await readDb();
+app.get('/api/zone-detail/:cave/:zone', authMiddleware, async (req, res) => {
+  const db = req.db;
   const { cave, zone } = req.params;
   const sites = (db.sites || []).filter((s) => s.cave === cave && s.zone === zone);
   const siteIds = sites.map((s) => s.id);
@@ -433,8 +565,8 @@ app.get('/api/zone-detail/:cave/:zone', async (req, res) => {
   });
 });
 
-app.get('/api/incident-stats', async (req, res) => {
-  const db = await readDb();
+app.get('/api/incident-stats', authMiddleware, async (req, res) => {
+  const db = req.db;
   const incidents = db.incidents || [];
   const sites = db.sites || [];
 
@@ -501,13 +633,13 @@ function normalizeHeaders(headers) {
   return map;
 }
 
-app.post('/api/surveys/import/preview', async (req, res) => {
+app.post('/api/surveys/import/preview', authMiddleware, requirePermission('import:surveys'), async (req, res) => {
   const { csvText } = req.body;
   if (!csvText || typeof csvText !== 'string') {
     return res.status(400).json({ error: 'CSV文本不能为空' });
   }
 
-  const db = await readDb();
+  const db = req.db;
   const sites = db.sites || [];
   const siteMap = new Map(sites.map((s) => [s.pointCode, s]));
 
@@ -592,16 +724,17 @@ app.post('/api/surveys/import/preview', async (req, res) => {
   });
 });
 
-app.post('/api/surveys/import', async (req, res) => {
+app.post('/api/surveys/import', authMiddleware, requirePermission('import:surveys'), async (req, res) => {
   const { csvText } = req.body;
   if (!csvText || typeof csvText !== 'string') {
     return res.status(400).json({ error: 'CSV文本不能为空' });
   }
 
-  const db = await readDb();
+  const db = req.db;
   const sites = db.sites || [];
   const siteMap = new Map(sites.map((s) => [s.pointCode, s]));
   const thresholdRules = getThresholdRules(db);
+  const operator = req.user ? req.user.name : (req.body?.operator || '批量导入');
 
   const { headers, rows } = parseCsv(csvText);
   const headerMap = normalizeHeaders(headers);
@@ -705,7 +838,7 @@ app.post('/api/surveys/import', async (req, res) => {
       before: null,
       after: item,
       note: `批量导入 · ${riskNote}`,
-      operator: req.body?.operator || normalized.surveyor || '批量导入'
+      operator
     });
     successItems.push({
       lineNumber: row.lineNumber,
@@ -727,26 +860,26 @@ app.post('/api/surveys/import', async (req, res) => {
   });
 });
 
-app.get('/api/audit-logs/:collection/:id', async (req, res) => {
-  const db = await readDb();
+app.get('/api/audit-logs/:collection/:id', authMiddleware, requirePermission('audit:view'), async (req, res) => {
+  const db = req.db;
   const { collection, id } = req.params;
   if (!Array.isArray(db[collection])) return res.status(404).json({ error: 'unknown collection' });
   const logs = audit.getAuditLogsForRecord(db, collection, id);
   res.json(logs);
 });
 
-app.get('/api/audit-logs/:logId', async (req, res) => {
-  const db = await readDb();
+app.get('/api/audit-logs/:logId', authMiddleware, requirePermission('audit:view'), async (req, res) => {
+  const db = req.db;
   const log = audit.getAuditLogById(db, req.params.logId);
   if (!log) return res.status(404).json({ error: 'audit log not found' });
   res.json(log);
 });
 
-app.post('/api/audit-logs/:logId/rollback', async (req, res) => {
-  const db = await readDb();
+app.post('/api/audit-logs/:logId/rollback', authMiddleware, requirePermission('audit:rollback'), async (req, res) => {
+  const db = req.db;
   const { logId } = req.params;
   const { note } = req.body || {};
-  const operator = req.body?.operator || req.headers['x-operator'] || 'system';
+  const operator = req.user ? req.user.name : (req.body?.operator || req.headers['x-operator'] || 'system');
   const result = audit.rollbackToAuditLog(db, logId, note, operator);
   if (result.error) return res.status(400).json({ error: result.error });
   await writeDb(db);

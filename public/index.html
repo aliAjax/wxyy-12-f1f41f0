@@ -14,7 +14,10 @@
           <h1 id="title">业务系统</h1>
           <p class="lede" id="lede"></p>
         </div>
-        <button class="secondary" id="refreshBtn">刷新数据</button>
+        <div class="header-right">
+          <div id="userInfo" class="user-info"></div>
+          <button class="secondary" id="refreshBtn">刷新数据</button>
+        </div>
       </div>
       <nav class="tabs" id="tabs"></nav>
     </header>
@@ -49,6 +52,34 @@
         <button class="ghost" data-close-diff>关闭</button>
       </div>
       <div class="modal-body" id="diffModalBody"></div>
+    </div>
+  </div>
+  <div class="modal" id="loginModal">
+    <div class="modal-backdrop" data-close-login></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>用户登录</h2>
+        <button class="ghost" data-close-login>关闭</button>
+      </div>
+      <div class="modal-body">
+        <form id="loginForm">
+          <label>用户名
+            <input type="text" name="username" required placeholder="请输入用户名">
+          </label>
+          <label>密码
+            <input type="password" name="password" required placeholder="请输入密码">
+          </label>
+          <div class="login-hint">
+            <p><strong>测试账号：</strong></p>
+            <p>管理员：admin / admin123</p>
+            <p>巡测员：surveyor / surveyor123</p>
+            <p>审核员：reviewer / reviewer123</p>
+          </div>
+          <div class="actions">
+            <button type="submit">登录</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
   <script src="/app.js"></script>

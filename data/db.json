@@ -1,4 +1,52 @@
 {
+  "users": [
+    {
+      "id": "user-admin-1",
+      "username": "admin",
+      "password": "admin123",
+      "role": "admin",
+      "name": "张管理",
+      "createdAt": "2026-06-01T00:00:00.000Z"
+    },
+    {
+      "id": "user-surveyor-1",
+      "username": "surveyor",
+      "password": "surveyor123",
+      "role": "surveyor",
+      "name": "李巡测",
+      "createdAt": "2026-06-01T00:00:00.000Z"
+    },
+    {
+      "id": "user-reviewer-1",
+      "username": "reviewer",
+      "password": "reviewer123",
+      "role": "reviewer",
+      "name": "王审核",
+      "createdAt": "2026-06-01T00:00:00.000Z"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "session-1782019456731-9cf12",
+      "token": "sess-1782019456731-7e026d71",
+      "userId": "user-admin-1",
+      "username": "admin",
+      "role": "admin",
+      "name": "张管理",
+      "createdAt": "2026-06-21T05:24:16.731Z",
+      "expiresAt": "2026-06-22T05:24:16.731Z"
+    },
+    {
+      "id": "session-1782018986417-2ed8e",
+      "token": "sess-1782018986417-07220b71",
+      "userId": "user-admin-1",
+      "username": "admin",
+      "role": "admin",
+      "name": "张管理",
+      "createdAt": "2026-06-21T05:16:26.417Z",
+      "expiresAt": "2026-06-22T05:16:26.418Z"
+    }
+  ],
   "thresholdRules": {
     "temperature": {
       "warning": 3,
@@ -790,6 +838,28 @@
           "note": "滴水帘东侧正常"
         }
       ]
+    },
+    {
+      "id": "surveys-1782019029258-ed959",
+      "siteId": "site-1",
+      "temperature": 17.5,
+      "humidity": 85,
+      "co2": 600,
+      "createdAt": "2026-06-21T05:17:09.258Z",
+      "updatedAt": "2026-06-21T05:17:09.258Z",
+      "history": [
+        {
+          "at": "2026-06-21T05:17:09.258Z",
+          "action": "创建",
+          "note": "自动判定：（）"
+        }
+      ],
+      "autoRiskLevel": "",
+      "autoRiskReasons": [],
+      "deviationTemp": 0,
+      "deviationHumidity": 0,
+      "deviationCo2": 0,
+      "manuallyReviewed": false
     }
   ],
   "plans": [
@@ -976,6 +1046,71 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "audit-1782019029258-7d3e2",
+      "collection": "surveys",
+      "recordId": "surveys-1782019029258-ed959",
+      "action": "create",
+      "actionLabel": "创建",
+      "before": null,
+      "after": {
+        "id": "surveys-1782019029258-ed959",
+        "siteId": "site-1",
+        "temperature": 17.5,
+        "humidity": 85,
+        "co2": 600,
+        "createdAt": "2026-06-21T05:17:09.258Z",
+        "updatedAt": "2026-06-21T05:17:09.258Z",
+        "history": [
+          {
+            "at": "2026-06-21T05:17:09.258Z",
+            "action": "创建",
+            "note": "自动判定：（）"
+          }
+        ],
+        "autoRiskLevel": "",
+        "autoRiskReasons": [],
+        "deviationTemp": 0,
+        "deviationHumidity": 0,
+        "deviationCo2": 0,
+        "manuallyReviewed": false
+      },
+      "diff": {
+        "siteId": {
+          "after": "site-1"
+        },
+        "temperature": {
+          "after": 17.5
+        },
+        "humidity": {
+          "after": 85
+        },
+        "co2": {
+          "after": 600
+        },
+        "autoRiskLevel": {
+          "after": ""
+        },
+        "autoRiskReasons": {
+          "after": []
+        },
+        "deviationTemp": {
+          "after": 0
+        },
+        "deviationHumidity": {
+          "after": 0
+        },
+        "deviationCo2": {
+          "after": 0
+        },
+        "manuallyReviewed": {
+          "after": false
+        }
+      },
+      "note": "",
+      "operator": "李巡测",
+      "createdAt": "2026-06-21T05:17:09.258Z"
+    },
     {
       "id": "audit-1782015107540-d10ca",
       "collection": "sites",
