@@ -6,6 +6,8 @@ const state = {
   editingDraftId: null,
   zoneOverview: null,
   activeZoneDetail: null,
+  zoneDetailCache: null,
+  microclimateTrends: null,
   importCsvText: '',
   importPreviewData: null,
   importResultData: null,
@@ -1005,6 +1007,210 @@ function renderHighRiskSummary() {
   </div>`;
 }
 
+function trendDirectionLabel(trend) {
+  const map = { up: '上升', down: '下降', stable: '稳定', insufficient: '样本不足' };
+  return map[trend] || '—';
+}
+
+function trendIcon(trend) {
+  const map = { up: '▲', down: '▼', stable: '—', insufficient: '○' };
+  return map[trend] || '○';
+}
+
+function trendTone(trend) {
+  if (trend === 'up') return 'bad';
+  if (trend === 'down') return 'ok';
+  if (trend === 'stable') return 'ok';
+  return '';
+}
+
+function riskTrendTone(trend) {
+  if (trend === 'up') return 'bad';
+  if (trend === 'down') return 'ok';
+  if (trend === 'stable') return 'warn';
+  return '';
+}
+
+function renderTrendIndicator(trend, isRisk = false) {
+  const label = trendDirectionLabel(trend);
+  const icon = trendIcon(trend);
+  const tone = isRisk ? riskTrendTone(trend) : trendTone(trend);
+  if (trend === 'insufficient') {
+    return `<span class="trend-indicator insufficient" title="样本不足，无法判断趋势">${icon} 样本不足</span>`;
+  }
+  return `<span class="trend-indicator ${tone}" title="${label}">${icon} ${label}</span>`;
+}
+
+function renderMetricTrend(metric, label, unit, decimals = 1) {
+  const avg = metric.avg;
+  const avgStr = avg !== null && avg !== undefined ? Number(avg).toFixed(decimals) : '—';
+  return `<div class="metric-trend">
+    <div class="metric-trend-label">${escapeHtml(label)}</div>
+    <div class="metric-trend-value">${avgStr}<span class="metric-unit">${escapeHtml(unit)}</span></div>
+    ${renderTrendIndicator(metric.trend)}
+  </div>`;
+}
+
+function renderAbnormalInfo(latestAbnormal, latestAbnormalSite) {
+  if (!latestAbnormal) {
+    return `<div class="trend-abnormal-empty muted-text">暂无异常样点</div>`;
+  }
+  const site = latestAbnormalSite || (latestAbnormal.siteId ? state.db.sites?.find((s) => s.id === latestAbnormal.siteId) : null);
+  const siteLabel = site ? `${site.cave} / ${site.zone} / ${site.pointCode}` : (latestAbnormal.siteId || '未知样点');
+  const riskLevel = latestAbnormal.autoRiskLevel || '预警';
+  const tone = riskLevel === '高风险' ? 'bad' : 'warn';
+  const reasons = (latestAbnormal.autoRiskReasons || []).slice(0, 2).join('；');
+  return `<div class="trend-abnormal">
+    <div class="trend-abnormal-head">
+      ${pill(riskLevel, tone)}
+      <span class="trend-abnormal-site">${escapeHtml(siteLabel)}</span>
+    </div>
+    ${reasons ? `<div class="trend-abnormal-reasons muted-text">${escapeHtml(reasons)}</div>` : ''}
+    <div class="trend-abnormal-meta muted-text">
+      ${escapeHtml(latestAbnormal.surveyor || '-')} · ${escapeHtml(latestAbnormal.date || '-')}
+    </div>
+  </div>`;
+}
+
+function renderZoneTrendCard(zone, caveName) {
+  return `<div class="zone-trend-card">
+    <div class="zone-trend-card-head">
+      <h4>${escapeHtml(zone.name)}</h4>
+      <div class="zone-trend-card-meta">
+        <span class="muted-text">${zone.siteCount} 样点 · ${zone.sampleCount} 条记录</span>
+        ${zone.riskTrend !== 'insufficient' ? renderTrendIndicator(zone.riskTrend, true) : ''}
+      </div>
+    </div>
+    ${zone.sampleCount === 0 ? `
+      <div class="trend-no-data">
+        <span class="trend-no-data-icon">📋</span>
+        <span>该分区暂无巡测记录</span>
+      </div>
+    ` : `
+      <div class="metrics-grid">
+        ${renderMetricTrend(zone.temperature, '温度', '℃', 1)}
+        ${renderMetricTrend(zone.humidity, '湿度', '%', 0)}
+        ${renderMetricTrend(zone.co2, 'CO₂', 'ppm', 0)}
+      </div>
+      <div class="zone-trend-stats">
+        <span class="pill ok">正常 ${zone.normalCount}</span>
+        <span class="pill warn">预警 ${zone.warningCount}</span>
+        <span class="pill bad">高风险 ${zone.highRiskCount}</span>
+      </div>
+      ${renderAbnormalInfo(zone.latestAbnormal, zone.latestAbnormalSite)}
+    `}
+  </div>`;
+}
+
+function renderCaveTrendBlock(cave) {
+  return `<div class="cave-trend-block">
+    <div class="cave-trend-block-head">
+      <div class="cave-trend-title">
+        <h3>${escapeHtml(cave.name)}</h3>
+        <span class="muted-text">${cave.zoneCount} 分区 · ${cave.siteCount} 样点 · ${cave.sampleCount || 0} 条记录</span>
+      </div>
+      ${cave.sampleCount > 0 ? `
+        <div class="cave-trend-summary">
+          ${cave.riskTrend !== 'insufficient' ? `<div class="cave-risk-trend"><span class="muted-text">风险趋势：</span>${renderTrendIndicator(cave.riskTrend, true)}</div>` : ''}
+          <div class="cave-risk-counts">
+            <span class="pill ok">正常 ${cave.normalCount}</span>
+            <span class="pill warn">预警 ${cave.warningCount}</span>
+            <span class="pill bad">高风险 ${cave.highRiskCount}</span>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+    ${cave.sampleCount > 0 ? `
+      <div class="cave-metrics-overview">
+        ${renderMetricTrend(cave.temperature, '平均温度', '℃', 1)}
+        ${renderMetricTrend(cave.humidity, '平均湿度', '%', 0)}
+        ${renderMetricTrend(cave.co2, '平均 CO₂', 'ppm', 0)}
+      </div>
+      ${cave.latestAbnormal ? `
+        <div class="cave-latest-abnormal">
+          <span class="cave-latest-abnormal-label">最新异常：</span>
+          ${renderAbnormalInfo(cave.latestAbnormal, cave.latestAbnormalSite)}
+        </div>
+      ` : ''}
+    ` : `
+      <div class="trend-no-data cave-no-data">
+        <span class="trend-no-data-icon">📋</span>
+        <span>该洞穴暂无巡测记录，建议尽快安排巡测</span>
+      </div>
+    `}
+    <div class="zone-trends-grid">
+      ${cave.zones.map((zone) => renderZoneTrendCard(zone, cave.name)).join('')}
+    </div>
+  </div>`;
+}
+
+function renderMicroclimateTrends() {
+  const data = state.microclimateTrends;
+  if (!data) {
+    return `<div class="panel microclimate-trend-panel">
+      <h2>微环境趋势
+        <span class="muted-text" style="font-weight:normal;font-size:13px;">（按洞穴和分区聚合最近 7 天或最近 10 条记录）</span>
+      </h2>
+      <div class="trend-loading">
+        <div class="loading-spinner"></div>
+        <span>正在加载趋势数据…</span>
+      </div>
+    </div>`;
+  }
+
+  const summary = data.summary || {};
+  const caves = data.caves || [];
+
+  if (!caves.length) {
+    return `<div class="panel microclimate-trend-panel">
+      <h2>微环境趋势
+        <span class="muted-text" style="font-weight:normal;font-size:13px;">（按洞穴和分区聚合最近 7 天或最近 10 条记录）</span>
+      </h2>
+      <div class="empty">暂无洞穴数据</div>
+    </div>`;
+  }
+
+  const cavesWithData = caves.filter((c) => c.sampleCount > 0).length;
+  const cavesWithoutData = caves.length - cavesWithData;
+
+  return `<div class="panel microclimate-trend-panel">
+    <h2>微环境趋势
+      <span class="muted-text" style="font-weight:normal;font-size:13px;">（按洞穴和分区聚合最近 7 天或最近 10 条记录）</span>
+    </h2>
+    <div class="trend-summary-bar">
+      <div class="trend-summary-item">
+        <span class="trend-summary-label">洞穴总数</span>
+        <span class="trend-summary-value">${summary.totalCaves || 0}</span>
+      </div>
+      <div class="trend-summary-item">
+        <span class="trend-summary-label">分区总数</span>
+        <span class="trend-summary-value">${summary.totalZones || 0}</span>
+      </div>
+      <div class="trend-summary-item">
+        <span class="trend-summary-label">样点总数</span>
+        <span class="trend-summary-value">${summary.totalSites || 0}</span>
+      </div>
+      <div class="trend-summary-item">
+        <span class="trend-summary-label">巡测记录</span>
+        <span class="trend-summary-value">${summary.totalSurveys || 0}</span>
+      </div>
+      <div class="trend-summary-item ok">
+        <span class="trend-summary-label">有数据样点</span>
+        <span class="trend-summary-value">${summary.sitesWithSurveys || 0}</span>
+      </div>
+      ${cavesWithoutData > 0 ? `
+        <div class="trend-summary-item warn">
+          <span class="trend-summary-label">无数据样点</span>
+          <span class="trend-summary-value">${summary.sitesWithoutSurveys || 0}</span>
+        </div>
+      ` : ''}
+    </div>
+    <div class="cave-trends-container">
+      ${caves.map(renderCaveTrendBlock).join('')}
+    </div>
+  </div>`;
+}
+
 function draftSiteLabel(siteId) {
   const site = state.db.sites?.find((s) => s.id === siteId);
   return site ? `${site.cave} / ${site.zone} / ${site.pointCode}` : (siteId || '未关联样点');
@@ -1231,6 +1437,7 @@ function renderDashboardView(view) {
   return `<section class="view active" id="${view.id}">
     ${renderStats()}
     ${renderHighRiskSummary()}
+    ${renderMicroclimateTrends()}
     <div class="panel"><h2>${escapeHtml(view.focusTitle)}</h2><div class="list">${items.length ? items.map((item) => renderCard(item, source.collection, cardView)).join('') : '<div class="empty">暂无重点事项</div>'}</div></div>
   </section>`;
 }
@@ -1777,12 +1984,14 @@ function render() {
 }
 
 async function load() {
-  const [db, overview] = await Promise.all([
+  const [db, overview, trends] = await Promise.all([
     api('/api/db'),
-    api('/api/zone-overview')
+    api('/api/zone-overview'),
+    api('/api/microclimate-trends')
   ]);
   state.db = db;
   state.zoneOverview = overview;
+  state.microclimateTrends = trends;
   render();
 }
 

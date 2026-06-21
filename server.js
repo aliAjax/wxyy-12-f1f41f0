@@ -656,6 +656,215 @@ app.get('/api/incident-stats', authMiddleware, async (req, res) => {
   });
 });
 
+function getTrendDirection(values, minSamples = 2) {
+  if (!values || values.length < minSamples) return 'insufficient';
+  const valid = values.filter((v) => typeof v === 'number' && !isNaN(v));
+  if (valid.length < minSamples) return 'insufficient';
+  const first = valid[0];
+  const last = valid[valid.length - 1];
+  const diff = last - first;
+  if (Math.abs(diff) < 0.001) return 'stable';
+  return diff > 0 ? 'up' : 'down';
+}
+
+function average(values) {
+  const valid = values.filter((v) => typeof v === 'number' && !isNaN(v));
+  if (!valid.length) return null;
+  return valid.reduce((s, v) => s + v, 0) / valid.length;
+}
+
+function aggregateZoneTrends(zoneSurveys, rules) {
+  if (!zoneSurveys.length) {
+    return {
+      sampleCount: 0,
+      latest: null,
+      temperature: { avg: null, trend: 'insufficient', values: [] },
+      humidity: { avg: null, trend: 'insufficient', values: [] },
+      co2: { avg: null, trend: 'insufficient', values: [] },
+      riskTrend: 'insufficient',
+      highRiskCount: 0,
+      warningCount: 0,
+      normalCount: 0,
+      latestAbnormal: null
+    };
+  }
+
+  const tempValues = zoneSurveys.map((s) => Number(s.temperature)).filter((v) => !isNaN(v));
+  const humValues = zoneSurveys.map((s) => Number(s.humidity)).filter((v) => !isNaN(v));
+  const co2Values = zoneSurveys.map((s) => Number(s.co2)).filter((v) => !isNaN(v));
+
+  const highRiskCount = zoneSurveys.filter((s) => s.autoRiskLevel === '高风险').length;
+  const warningCount = zoneSurveys.filter((s) => s.autoRiskLevel === '预警').length;
+  const normalCount = zoneSurveys.filter((s) => !s.autoRiskLevel || s.autoRiskLevel === '正常').length;
+
+  let riskTrend = 'stable';
+  if (zoneSurveys.length >= 2) {
+    const firstHalf = zoneSurveys.slice(0, Math.floor(zoneSurveys.length / 2));
+    const secondHalf = zoneSurveys.slice(Math.floor(zoneSurveys.length / 2));
+    const firstRisk = firstHalf.filter((s) => s.autoRiskLevel === '高风险').length;
+    const secondRisk = secondHalf.filter((s) => s.autoRiskLevel === '高风险').length;
+    if (secondRisk > firstRisk) riskTrend = 'up';
+    else if (secondRisk < firstRisk) riskTrend = 'down';
+  }
+
+  const latestAbnormalSurvey = zoneSurveys.find((s) => s.status === '异常待复查') || zoneSurveys.find((s) => s.autoRiskLevel === '高风险') || zoneSurveys.find((s) => s.autoRiskLevel === '预警') || null;
+
+  return {
+    sampleCount: zoneSurveys.length,
+    latest: zoneSurveys[0] || null,
+    temperature: {
+      avg: average(tempValues),
+      trend: getTrendDirection(tempValues),
+      values: tempValues
+    },
+    humidity: {
+      avg: average(humValues),
+      trend: getTrendDirection(humValues),
+      values: humValues
+    },
+    co2: {
+      avg: average(co2Values),
+      trend: getTrendDirection(co2Values),
+      values: co2Values
+    },
+    riskTrend,
+    highRiskCount,
+    warningCount,
+    normalCount,
+    latestAbnormal: latestAbnormalSurvey
+  };
+}
+
+app.get('/api/microclimate-trends', authMiddleware, async (req, res) => {
+  const db = req.db;
+  const sites = db.sites || [];
+  const surveys = db.surveys || [];
+  const layout = config.zoneLayout || {};
+  const rules = getThresholdRules(db);
+
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const caveMap = {};
+  for (const site of sites) {
+    const cave = site.cave || '未分类洞穴';
+    const zone = site.zone || '未分区';
+    if (!caveMap[cave]) caveMap[cave] = { zones: {}, siteIds: [] };
+    if (!caveMap[cave].zones[zone]) caveMap[cave].zones[zone] = { siteIds: [] };
+    caveMap[cave].zones[zone].siteIds.push(site.id);
+    caveMap[cave].siteIds.push(site.id);
+  }
+
+  const surveyBySite = {};
+  for (const s of surveys) {
+    if (!s.siteId) continue;
+    if (!surveyBySite[s.siteId]) surveyBySite[s.siteId] = [];
+    surveyBySite[s.siteId].push(s);
+  }
+
+  for (const siteId of Object.keys(surveyBySite)) {
+    surveyBySite[siteId].sort(sortNewest);
+  }
+
+  const caves = [];
+  for (const caveName of Object.keys(caveMap)) {
+    const caveData = caveMap[caveName];
+    const caveLayout = layout[caveName];
+
+    const caveSiteIds = caveData.siteIds;
+    let caveAllSurveys = [];
+    for (const sid of caveSiteIds) {
+      if (surveyBySite[sid]) {
+        const siteSurveys = surveyBySite[sid];
+        const recent10 = siteSurveys.slice(0, 10);
+        const recent7Days = siteSurveys.filter((s) => {
+          const d = new Date(s.createdAt || s.date || 0);
+          return d >= sevenDaysAgo;
+        });
+        const used = recent7Days.length > 0 ? recent7Days : recent10;
+        caveAllSurveys = caveAllSurveys.concat(used);
+      }
+    }
+    caveAllSurveys.sort(sortNewest);
+    caveAllSurveys = caveAllSurveys.slice(0, 50);
+
+    const zones = [];
+    for (const zoneName of Object.keys(caveData.zones)) {
+      const zoneLayout = caveLayout?.zones?.find((z) => z.name === zoneName);
+      const zoneSiteIds = caveData.zones[zoneName].siteIds;
+
+      let zoneSurveys = [];
+      for (const sid of zoneSiteIds) {
+        if (surveyBySite[sid]) {
+          const siteSurveys = surveyBySite[sid];
+          const recent10 = siteSurveys.slice(0, 10);
+          const recent7Days = siteSurveys.filter((s) => {
+            const d = new Date(s.createdAt || s.date || 0);
+            return d >= sevenDaysAgo;
+          });
+          const used = recent7Days.length > 0 ? recent7Days : recent10;
+          zoneSurveys = zoneSurveys.concat(used);
+        }
+      }
+      zoneSurveys.sort(sortNewest);
+      zoneSurveys = zoneSurveys.slice(0, 30);
+
+      const trends = aggregateZoneTrends(zoneSurveys, rules);
+
+      let latestAbnormalSite = null;
+      if (trends.latestAbnormal) {
+        latestAbnormalSite = sites.find((s) => s.id === trends.latestAbnormal.siteId) || null;
+      }
+
+      zones.push({
+        name: zoneName,
+        order: zoneLayout?.order ?? 99,
+        route: zoneLayout?.route || '',
+        siteCount: zoneSiteIds.length,
+        ...trends,
+        latestAbnormalSite
+      });
+    }
+
+    zones.sort((a, b) => a.order - b.order);
+
+    const caveTrends = aggregateZoneTrends(caveAllSurveys, rules);
+    let caveLatestAbnormalSite = null;
+    if (caveTrends.latestAbnormal) {
+      caveLatestAbnormalSite = sites.find((s) => s.id === caveTrends.latestAbnormal.siteId) || null;
+    }
+
+    caves.push({
+      name: caveName,
+      order: caveLayout?.order ?? 99,
+      siteCount: caveSiteIds.length,
+      zoneCount: zones.length,
+      zones,
+      ...caveTrends,
+      latestAbnormalSite: caveLatestAbnormalSite
+    });
+  }
+
+  caves.sort((a, b) => a.order - b.order);
+
+  const totalSurveys = surveys.length;
+  const withSurveys = Object.keys(surveyBySite).length;
+  const noSurveySites = sites.length - withSurveys;
+
+  res.json({
+    generatedAt: now.toISOString(),
+    summary: {
+      totalCaves: caves.length,
+      totalZones: caves.reduce((s, c) => s + c.zoneCount, 0),
+      totalSites: sites.length,
+      totalSurveys,
+      sitesWithSurveys: withSurveys,
+      sitesWithoutSurveys: noSurveySites
+    },
+    caves
+  });
+});
+
 function parseCsv(text) {
   const lines = text.trim().split(/\r?\n/).filter((line) => line.trim());
   if (!lines.length) return { headers: [], rows: [] };
