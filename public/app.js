@@ -13,7 +13,8 @@ const state = {
   activeAuditRecord: null,
   activeDiffLog: null,
   currentUser: null,
-  authToken: null
+  authToken: null,
+  listFilters: {}
 };
 
 const TOKEN_STORAGE_KEY = 'wxyy_auth_token_v1';
@@ -929,10 +930,26 @@ function renderCard(item, collection, view) {
 
 function renderList(view) {
   const collection = view.collection;
-  const query = $(`#search-${view.id}`)?.value.trim() || '';
-  const status = $(`#status-${view.id}`)?.value || '';
-  const filterValue = view.filterField ? ($(`#filter-${view.id}`)?.value || '') : '';
-  const typeFilterValue = view.typeFilterField ? ($(`#typeFilter-${view.id}`)?.value || '') : '';
+  const isSurveyView = collection === 'surveys';
+  const viewFilters = state.listFilters[view.id] || {};
+  const query = ($(`#search-${view.id}`)?.value?.trim()) || viewFilters.search || '';
+  const status = ($(`#status-${view.id}`)?.value) || viewFilters.status || '';
+  const filterValue = view.filterField ? (($(`#filter-${view.id}`)?.value) || (viewFilters[view.filterField] || '')) : '';
+  const typeFilterValue = view.typeFilterField ? (($(`#typeFilter-${view.id}`)?.value) || (viewFilters[view.typeFilterField] || '')) : '';
+  const autoRiskValue = isSurveyView ? (($(`#autoRisk-${view.id}`)?.value) || viewFilters.autoRiskLevel || '') : '';
+  const importedIdsStr = isSurveyView ? (viewFilters.importedIds || '') : '';
+  const importedIds = importedIdsStr ? importedIdsStr.split(',').filter(Boolean) : [];
+
+  state.listFilters[view.id] = {
+    ...viewFilters,
+    search: query,
+    status,
+    ...(view.filterField ? { [view.filterField]: filterValue } : {}),
+    ...(view.typeFilterField ? { [view.typeFilterField]: typeFilterValue } : {}),
+    ...(isSurveyView ? { autoRiskLevel: autoRiskValue } : {}),
+    ...(isSurveyView && importedIdsStr ? { importedIds: importedIdsStr } : {})
+  };
+
   let items = [...(state.db[collection] || [])];
   if (query) {
     items = items.filter((item) => view.searchFields.some((field) => searchValueByPath(item, field).includes(query)));
@@ -945,6 +962,17 @@ function renderList(view) {
   }
   if (typeFilterValue && view.typeFilterField) {
     items = items.filter((item) => item[view.typeFilterField] === typeFilterValue);
+  }
+  if (autoRiskValue && isSurveyView) {
+    items = items.filter((item) => {
+      const level = item.autoRiskLevel || '正常';
+      if (autoRiskValue === '正常') return level === '正常' || level === '';
+      return level === autoRiskValue;
+    });
+  }
+  if (importedIds.length && isSurveyView) {
+    const idSet = new Set(importedIds);
+    items = items.filter((item) => idSet.has(item.id));
   }
   return items.length ? items.map((item) => renderCard(item, collection, view)).join('') : `<div class="empty">暂无${escapeHtml(collectionLabel(collection))}</div>`;
 }
@@ -1249,9 +1277,20 @@ function renderCrudView(view) {
     ? `<button type="button" class="ghost" data-save-draft ${!state.currentUser ? 'disabled title="请先登录"' : ''}>保存草稿（离线暂存）</button>`
     : '';
   const submitLabel = isSurveyView && state.editingDraftId ? '更新草稿并提交入库' : (view.submitLabel || '保存');
-  const hasExtraFilters = view.filterField || view.typeFilterField;
+  const viewFilters = state.listFilters[view.id] || {};
+  const presetStatus = viewFilters.status || '';
+  const presetAutoRisk = viewFilters.autoRiskLevel || '';
+  const presetImportedIds = viewFilters.importedIds || '';
+  const hasSurveyExtraFilters = isSurveyView;
+  const hasExtraFilters = view.filterField || view.typeFilterField || hasSurveyExtraFilters;
   const toolbarClass = hasExtraFilters ? 'toolbar toolbar-wide' : 'toolbar';
   const formDisabled = !canCreate;
+
+  const activeFilterBadges = [];
+  if (presetStatus) activeFilterBadges.push(`<span class="pill active-filter" data-clear-filter="status" data-view="${view.id}">状态: ${escapeHtml(presetStatus)} ✕</span>`);
+  if (presetAutoRisk) activeFilterBadges.push(`<span class="pill active-filter ${presetAutoRisk === '高风险' ? 'bad' : (presetAutoRisk === '预警' ? 'warn' : 'ok')}" data-clear-filter="autoRiskLevel" data-view="${view.id}">风险等级: ${escapeHtml(presetAutoRisk)} ✕</span>`);
+  if (presetImportedIds) activeFilterBadges.push(`<span class="pill active-filter" data-clear-filter="importedIds" data-view="${view.id}">本次导入记录 ✕</span>`);
+  const activeFilterHtml = activeFilterBadges.length ? `<div class="active-filters-bar">筛选中：${activeFilterBadges.join('')}</div>` : '';
 
   const baselineHint = isSitesView && canCreate ? baselineImpactHint({ id: 'new' }) : '';
 
@@ -1270,20 +1309,27 @@ function renderCrudView(view) {
       <div class="panel">
         <h2>${escapeHtml(view.listTitle)} <span class="muted-text">（已入库记录）</span></h2>
         <div class="${toolbarClass}">
-          <input id="search-${view.id}" placeholder="${escapeHtml(view.searchPlaceholder || '搜索')}">
+          <input id="search-${view.id}" placeholder="${escapeHtml(view.searchPlaceholder || '搜索')}" value="${escapeHtml(viewFilters.search || '')}">
           <select id="status-${view.id}">
             <option value="">全部状态</option>
-            ${statusOptions.map((option) => `<option>${escapeHtml(option)}</option>`).join('')}
+            ${statusOptions.map((option) => `<option ${option === presetStatus ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
           </select>
           ${view.filterField ? `<select id="filter-${view.id}">
             <option value="">全部${escapeHtml(view.filterLabel || view.filterField)}</option>
-            ${filterOptions.map((option) => `<option>${escapeHtml(option)}</option>`).join('')}
+            ${filterOptions.map((option) => `<option ${option === (viewFilters[view.filterField] || '') ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
           </select>` : ''}
           ${view.typeFilterField ? `<select id="typeFilter-${view.id}">
             <option value="">全部${escapeHtml(view.typeFilterLabel || view.typeFilterField)}</option>
-            ${typeFilterOptions.map((option) => `<option>${escapeHtml(option)}</option>`).join('')}
+            ${typeFilterOptions.map((option) => `<option ${option === (viewFilters[view.typeFilterField] || '') ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+          </select>` : ''}
+          ${isSurveyView ? `<select id="autoRisk-${view.id}">
+            <option value="">全部风险等级</option>
+            <option value="正常" ${"正常" === presetAutoRisk ? 'selected' : ''}>正常</option>
+            <option value="预警" ${"预警" === presetAutoRisk ? 'selected' : ''}>预警</option>
+            <option value="高风险" ${"高风险" === presetAutoRisk ? 'selected' : ''}>高风险</option>
           </select>` : ''}
         </div>
+        ${activeFilterHtml}
         <div class="list" id="list-${view.id}">${renderList(view)}</div>
       </div>
     </div>
@@ -1486,8 +1532,65 @@ function renderImportView(view) {
           <div class="import-stat ok"><span>成功</span><strong>${resultData.success}</strong></div>
           <div class="import-stat bad"><span>失败</span><strong>${resultData.failed}</strong></div>
         </div>
+        ${resultData.riskSummary ? `
+          <div class="import-risk-summary">
+            <div class="import-risk-summary-title">风险结果摘要</div>
+            <div class="import-risk-summary-stats">
+              <div class="import-stat risk-stat ok"><span>正常</span><strong>${resultData.riskSummary.normal}</strong></div>
+              <div class="import-stat risk-stat warn"><span>预警</span><strong>${resultData.riskSummary.warning}</strong></div>
+              <div class="import-stat risk-stat bad"><span>高风险</span><strong>${resultData.riskSummary.highRisk}</strong></div>
+            </div>
+          </div>
+        ` : ''}
       </div>
     `;
+    let riskGroupsHtml = '';
+    if (resultData.riskGroups) {
+      const groupConfigs = [
+        { key: 'normal', tone: 'ok' },
+        { key: 'warning', tone: 'warn' },
+        { key: 'highRisk', tone: 'bad' }
+      ];
+      const groupCardsHtml = groupConfigs.map((cfg) => {
+        const group = resultData.riskGroups[cfg.key];
+        if (!group || group.count === 0) return '';
+        const itemsHtml = group.items.slice(0, 20).map((item) => `
+          <div class="import-risk-group-item">
+            <span class="import-risk-line">第${item.lineNumber}行</span>
+            <span class="import-risk-pointcode">${escapeHtml(item.pointCode)}</span>
+            <span class="pill ${cfg.tone}">${escapeHtml(group.label)}</span>
+          </div>
+        `).join('');
+        const moreHtml = group.count > 20 ? `<div class="import-risk-group-more">...还有 ${group.count - 20} 条，点击下方按钮查看全部</div>` : '';
+        return `
+          <div class="import-risk-group-card ${cfg.tone}">
+            <div class="import-risk-group-head">
+              <span class="pill ${cfg.tone}">${escapeHtml(group.label)}</span>
+              <span class="import-risk-group-count">共 ${group.count} 条</span>
+              <button class="ghost small" data-jump-surveys="autoRiskLevel:${cfg.key === 'highRisk' ? '高风险' : (cfg.key === 'warning' ? '预警' : '正常')}">查看全部 →</button>
+            </div>
+            <div class="import-risk-group-items">
+              ${itemsHtml}
+              ${moreHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+      const jumpAllBtn = resultData.importedIds && resultData.importedIds.length ? `
+        <div class="import-risk-jump-all">
+          <button data-jump-surveys="importedIds:${resultData.importedIds.join(',')}" class="secondary">查看本次导入的全部巡测记录 →</button>
+        </div>
+      ` : '';
+      riskGroupsHtml = `
+        <div id="importRiskGroups">
+          <h3>成功记录按风险分组</h3>
+          <div class="import-risk-groups-grid">
+            ${groupCardsHtml}
+          </div>
+          ${jumpAllBtn}
+        </div>
+      `;
+    }
     let failedHtml = '';
     if (resultData.failed > 0 && resultData.failedItems) {
       const failedItemsHtml = resultData.failedItems.map((item) => `
@@ -1511,6 +1614,7 @@ function renderImportView(view) {
     resultHtml = `
       <div class="import-result-area">
         <div class="import-result-summary">${resultCardHtml}</div>
+        ${riskGroupsHtml}
         ${failedHtml}
       </div>
     `;
@@ -1968,16 +2072,44 @@ document.addEventListener('click', async (event) => {
   if (importClearBtn) {
     clearImport();
   }
+  const jumpSurveysBtn = event.target.closest('[data-jump-surveys]');
+  if (jumpSurveysBtn) {
+    const filterSpec = jumpSurveysBtn.dataset.jumpSurveys;
+    const colonIdx = filterSpec.indexOf(':');
+    const filterKey = filterSpec.slice(0, colonIdx);
+    const filterValue = filterSpec.slice(colonIdx + 1);
+    state.listFilters.surveys = { ...(state.listFilters.surveys || {}) };
+    for (const k of ['status', 'autoRiskLevel', 'importedIds', 'search']) {
+      delete state.listFilters.surveys[k];
+    }
+    state.listFilters.surveys[filterKey] = filterValue;
+    render();
+    setTab('surveys');
+    return;
+  }
+  const clearFilterBtn = event.target.closest('[data-clear-filter]');
+  if (clearFilterBtn) {
+    const viewId = clearFilterBtn.dataset.view;
+    const filterKey = clearFilterBtn.dataset.clearFilter;
+    if (state.listFilters[viewId]) {
+      delete state.listFilters[viewId][filterKey];
+    }
+    render();
+    setTab(viewId);
+    return;
+  }
 });
 
 document.addEventListener('input', (event) => {
-  const view = state.config.views.find((entry) => entry.id && (event.target.id === `search-${entry.id}` || event.target.id === `status-${entry.id}` || event.target.id === `filter-${entry.id}`));
+  const view = state.config.views.find((entry) => entry.id && (event.target.id === `search-${entry.id}` || event.target.id === `status-${entry.id}` || event.target.id === `filter-${entry.id}` || event.target.id === `autoRisk-${entry.id}`));
   if (view) $(`#list-${view.id}`).innerHTML = renderList(view);
 });
 
 document.addEventListener('change', (event) => {
-  const view = state.config.views.find((entry) => entry.id && (event.target.id === `status-${entry.id}` || event.target.id === `filter-${entry.id}` || event.target.id === `typeFilter-${entry.id}`));
-  if (view) $(`#list-${view.id}`).innerHTML = renderList(view);
+  const view = state.config.views.find((entry) => entry.id && (event.target.id === `status-${entry.id}` || event.target.id === `filter-${entry.id}` || event.target.id === `typeFilter-${entry.id}` || event.target.id === `autoRisk-${entry.id}`));
+  if (view) {
+    $(`#list-${view.id}`).innerHTML = renderList(view);
+  }
   const draftCheck = event.target.closest('[data-draft-check]');
   if (draftCheck) {
     const id = draftCheck.dataset.draftCheck;

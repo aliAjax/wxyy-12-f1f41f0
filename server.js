@@ -908,12 +908,41 @@ app.post('/api/surveys/import', authMiddleware, requirePermission('import:survey
 
   await writeDb(db);
 
+  const normalItems = successItems.filter((item) => item.autoRiskLevel === '正常' || !item.autoRiskLevel);
+  const warningItems = successItems.filter((item) => item.autoRiskLevel === '预警');
+  const highRiskItems = successItems.filter((item) => item.autoRiskLevel === '高风险');
+
+  const riskGroups = {
+    normal: {
+      label: '正常',
+      count: normalItems.length,
+      items: normalItems
+    },
+    warning: {
+      label: '预警',
+      count: warningItems.length,
+      items: warningItems
+    },
+    highRisk: {
+      label: '高风险',
+      count: highRiskItems.length,
+      items: highRiskItems
+    }
+  };
+
   res.json({
     total: rows.length,
     success: successItems.length,
     failed: failedItems.length,
     successItems,
-    failedItems
+    failedItems,
+    riskSummary: {
+      normal: normalItems.length,
+      warning: warningItems.length,
+      highRisk: highRiskItems.length
+    },
+    riskGroups,
+    importedIds: successItems.map((item) => item.id)
   });
 });
 
