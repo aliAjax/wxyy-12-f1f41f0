@@ -116,10 +116,9 @@ app.post('/api/:collection', async (req, res) => {
   if (!Array.isArray(db[collection])) return res.status(404).json({ error: 'unknown collection' });
   if (collection === 'incidents') {
     const siteId = req.body.siteId;
-    if (siteId) {
-      const siteExists = db.sites?.some((s) => s.id === siteId);
-      if (!siteExists) return res.status(400).json({ error: '关联样点不存在，无法创建事件' });
-    }
+    if (!siteId) return res.status(400).json({ error: '关联样点必填，无法创建事件' });
+    const siteExists = db.sites?.some((s) => s.id === siteId);
+    if (!siteExists) return res.status(400).json({ error: '关联样点不存在，无法创建事件' });
   }
   const now = new Date().toISOString();
   const thresholdRules = getThresholdRules(db);
