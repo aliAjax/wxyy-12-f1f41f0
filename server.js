@@ -689,29 +689,40 @@ function aggregateZoneTrends(zoneSurveys, rules) {
     };
   }
 
-  const tempValues = zoneSurveys.map((s) => Number(s.temperature)).filter((v) => !isNaN(v));
-  const humValues = zoneSurveys.map((s) => Number(s.humidity)).filter((v) => !isNaN(v));
-  const co2Values = zoneSurveys.map((s) => Number(s.co2)).filter((v) => !isNaN(v));
+  const ordered = [...zoneSurveys].sort((a, b) => {
+    const ta = new Date(a.createdAt || a.date || 0).getTime();
+    const tb = new Date(b.createdAt || b.date || 0).getTime();
+    return ta - tb;
+  });
+  const latest = ordered[ordered.length - 1] || null;
 
-  const highRiskCount = zoneSurveys.filter((s) => s.autoRiskLevel === '高风险').length;
-  const warningCount = zoneSurveys.filter((s) => s.autoRiskLevel === '预警').length;
-  const normalCount = zoneSurveys.filter((s) => !s.autoRiskLevel || s.autoRiskLevel === '正常').length;
+  const tempValues = ordered.map((s) => Number(s.temperature)).filter((v) => !isNaN(v));
+  const humValues = ordered.map((s) => Number(s.humidity)).filter((v) => !isNaN(v));
+  const co2Values = ordered.map((s) => Number(s.co2)).filter((v) => !isNaN(v));
+
+  const highRiskCount = ordered.filter((s) => s.autoRiskLevel === '高风险').length;
+  const warningCount = ordered.filter((s) => s.autoRiskLevel === '预警').length;
+  const normalCount = ordered.filter((s) => !s.autoRiskLevel || s.autoRiskLevel === '正常').length;
 
   let riskTrend = 'stable';
-  if (zoneSurveys.length >= 2) {
-    const firstHalf = zoneSurveys.slice(0, Math.floor(zoneSurveys.length / 2));
-    const secondHalf = zoneSurveys.slice(Math.floor(zoneSurveys.length / 2));
-    const firstRisk = firstHalf.filter((s) => s.autoRiskLevel === '高风险').length;
-    const secondRisk = secondHalf.filter((s) => s.autoRiskLevel === '高风险').length;
+  if (ordered.length >= 2) {
+    const mid = Math.floor(ordered.length / 2);
+    const firstHalf = ordered.slice(0, mid);
+    const secondHalf = ordered.slice(mid);
+    const firstRisk = firstHalf.filter((s) => s.autoRiskLevel === '高风险' || s.autoRiskLevel === '预警').length;
+    const secondRisk = secondHalf.filter((s) => s.autoRiskLevel === '高风险' || s.autoRiskLevel === '预警').length;
     if (secondRisk > firstRisk) riskTrend = 'up';
     else if (secondRisk < firstRisk) riskTrend = 'down';
   }
 
-  const latestAbnormalSurvey = zoneSurveys.find((s) => s.status === '异常待复查') || zoneSurveys.find((s) => s.autoRiskLevel === '高风险') || zoneSurveys.find((s) => s.autoRiskLevel === '预警') || null;
+  const latestAbnormalSurvey = [...ordered].reverse().find((s) => s.status === '异常待复查')
+    || [...ordered].reverse().find((s) => s.autoRiskLevel === '高风险')
+    || [...ordered].reverse().find((s) => s.autoRiskLevel === '预警')
+    || null;
 
   return {
-    sampleCount: zoneSurveys.length,
-    latest: zoneSurveys[0] || null,
+    sampleCount: ordered.length,
+    latest,
     temperature: {
       avg: average(tempValues),
       trend: getTrendDirection(tempValues),
