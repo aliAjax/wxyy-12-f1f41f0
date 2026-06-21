@@ -353,6 +353,39 @@
           "note": "样点建档"
         }
       ]
+    },
+    {
+      "id": "sites-1782014879287-da057",
+      "createdAt": "2026-06-21T04:07:59.286Z",
+      "updatedAt": "2026-06-21T04:11:47.540Z",
+      "history": [
+        {
+          "at": "2026-06-21T04:11:47.540Z",
+          "action": "回滚",
+          "note": "前端测试回滚"
+        },
+        {
+          "at": "2026-06-21T04:11:14.083Z",
+          "action": "更新",
+          "note": "更新为重点保护，调整基准温度"
+        },
+        {
+          "at": "2026-06-21T04:07:59.287Z",
+          "action": "创建",
+          "note": "前端UI测试样点2"
+        }
+      ],
+      "cave": "北麓三号洞",
+      "zone": "前端测试区",
+      "pointCode": "UI-TEST-002",
+      "route": "东线巡测",
+      "sensitivity": "中",
+      "protectedStatus": "常规观察",
+      "baselineTemp": 16.8,
+      "baselineHumidity": 82,
+      "baselineCo2": 650,
+      "note": "前端UI测试样点2",
+      "operator": "前端测试员"
     }
   ],
   "surveys": [
@@ -940,6 +973,637 @@
           "note": "监测设备被游客碰倒"
         }
       ]
+    }
+  ],
+  "auditLogs": [
+    {
+      "id": "audit-1782015107540-d10ca",
+      "collection": "sites",
+      "recordId": "sites-1782014879287-da057",
+      "action": "rollback",
+      "actionLabel": "回滚",
+      "before": {
+        "id": "sites-1782014879287-da057",
+        "cave": "北麓三号洞",
+        "zone": "前端测试区",
+        "pointCode": "UI-TEST-002",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "重点保护",
+        "baselineTemp": 16,
+        "baselineHumidity": 82,
+        "baselineCo2": 650,
+        "note": "更新为重点保护，调整基准温度",
+        "operator": "前端测试员",
+        "createdAt": "2026-06-21T04:07:59.286Z",
+        "updatedAt": "2026-06-21T04:11:14.083Z",
+        "history": [
+          {
+            "at": "2026-06-21T04:11:14.083Z",
+            "action": "更新",
+            "note": "更新为重点保护，调整基准温度"
+          },
+          {
+            "at": "2026-06-21T04:07:59.287Z",
+            "action": "创建",
+            "note": "前端UI测试样点2"
+          }
+        ]
+      },
+      "after": {
+        "id": "sites-1782014879287-da057",
+        "createdAt": "2026-06-21T04:07:59.286Z",
+        "updatedAt": "2026-06-21T04:11:47.540Z",
+        "history": [
+          {
+            "at": "2026-06-21T04:11:47.540Z",
+            "action": "回滚",
+            "note": "前端测试回滚"
+          },
+          {
+            "at": "2026-06-21T04:11:14.083Z",
+            "action": "更新",
+            "note": "更新为重点保护，调整基准温度"
+          },
+          {
+            "at": "2026-06-21T04:07:59.287Z",
+            "action": "创建",
+            "note": "前端UI测试样点2"
+          }
+        ],
+        "cave": "北麓三号洞",
+        "zone": "前端测试区",
+        "pointCode": "UI-TEST-002",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "常规观察",
+        "baselineTemp": 16.8,
+        "baselineHumidity": 82,
+        "baselineCo2": 650,
+        "note": "前端UI测试样点2",
+        "operator": "前端测试员"
+      },
+      "diff": {
+        "protectedStatus": {
+          "before": "重点保护",
+          "after": "常规观察"
+        },
+        "baselineTemp": {
+          "before": 16,
+          "after": 16.8
+        },
+        "note": {
+          "before": "更新为重点保护，调整基准温度",
+          "after": "前端UI测试样点2"
+        }
+      },
+      "note": "前端测试回滚，源审计记录：audit-1782014879287-9b631",
+      "operator": "system",
+      "createdAt": "2026-06-21T04:11:47.540Z"
+    },
+    {
+      "id": "audit-1782015074083-861d5",
+      "collection": "sites",
+      "recordId": "sites-1782014879287-da057",
+      "action": "update",
+      "actionLabel": "更新",
+      "before": {
+        "id": "sites-1782014879287-da057",
+        "cave": "北麓三号洞",
+        "zone": "前端测试区",
+        "pointCode": "UI-TEST-002",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "常规观察",
+        "baselineTemp": 16.8,
+        "baselineHumidity": 82,
+        "baselineCo2": 650,
+        "note": "前端UI测试样点2",
+        "operator": "前端测试员",
+        "createdAt": "2026-06-21T04:07:59.286Z",
+        "updatedAt": "2026-06-21T04:07:59.286Z",
+        "history": [
+          {
+            "at": "2026-06-21T04:07:59.287Z",
+            "action": "创建",
+            "note": "前端UI测试样点2"
+          }
+        ]
+      },
+      "after": {
+        "id": "sites-1782014879287-da057",
+        "cave": "北麓三号洞",
+        "zone": "前端测试区",
+        "pointCode": "UI-TEST-002",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "重点保护",
+        "baselineTemp": 16,
+        "baselineHumidity": 82,
+        "baselineCo2": 650,
+        "note": "更新为重点保护，调整基准温度",
+        "operator": "前端测试员",
+        "createdAt": "2026-06-21T04:07:59.286Z",
+        "updatedAt": "2026-06-21T04:11:14.083Z",
+        "history": [
+          {
+            "at": "2026-06-21T04:11:14.083Z",
+            "action": "更新",
+            "note": "更新为重点保护，调整基准温度"
+          },
+          {
+            "at": "2026-06-21T04:07:59.287Z",
+            "action": "创建",
+            "note": "前端UI测试样点2"
+          }
+        ]
+      },
+      "diff": {
+        "protectedStatus": {
+          "before": "常规观察",
+          "after": "重点保护"
+        },
+        "baselineTemp": {
+          "before": 16.8,
+          "after": 16
+        },
+        "note": {
+          "before": "前端UI测试样点2",
+          "after": "更新为重点保护，调整基准温度"
+        }
+      },
+      "note": "更新为重点保护，调整基准温度",
+      "operator": "修改测试员",
+      "createdAt": "2026-06-21T04:11:14.083Z"
+    },
+    {
+      "id": "audit-1782014879287-9b631",
+      "collection": "sites",
+      "recordId": "sites-1782014879287-da057",
+      "action": "create",
+      "actionLabel": "创建",
+      "before": null,
+      "after": {
+        "id": "sites-1782014879287-da057",
+        "cave": "北麓三号洞",
+        "zone": "前端测试区",
+        "pointCode": "UI-TEST-002",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "常规观察",
+        "baselineTemp": 16.8,
+        "baselineHumidity": 82,
+        "baselineCo2": 650,
+        "note": "前端UI测试样点2",
+        "operator": "前端测试员",
+        "createdAt": "2026-06-21T04:07:59.286Z",
+        "updatedAt": "2026-06-21T04:07:59.286Z",
+        "history": [
+          {
+            "at": "2026-06-21T04:07:59.287Z",
+            "action": "创建",
+            "note": "前端UI测试样点2"
+          }
+        ]
+      },
+      "diff": {
+        "cave": {
+          "after": "北麓三号洞"
+        },
+        "zone": {
+          "after": "前端测试区"
+        },
+        "pointCode": {
+          "after": "UI-TEST-002"
+        },
+        "route": {
+          "after": "东线巡测"
+        },
+        "sensitivity": {
+          "after": "中"
+        },
+        "protectedStatus": {
+          "after": "常规观察"
+        },
+        "baselineTemp": {
+          "after": 16.8
+        },
+        "baselineHumidity": {
+          "after": 82
+        },
+        "baselineCo2": {
+          "after": 650
+        },
+        "note": {
+          "after": "前端UI测试样点2"
+        },
+        "operator": {
+          "after": "前端测试员"
+        }
+      },
+      "note": "前端UI测试样点2",
+      "operator": "前端测试员",
+      "createdAt": "2026-06-21T04:07:59.287Z"
+    },
+    {
+      "id": "audit-1782014563461-79ae7",
+      "collection": "sites",
+      "recordId": "sites-1782014417305-7fa60",
+      "action": "delete",
+      "actionLabel": "删除",
+      "before": {
+        "id": "sites-1782014417305-7fa60",
+        "createdAt": "2026-06-21T04:00:17.305Z",
+        "updatedAt": "2026-06-21T04:02:26.888Z",
+        "history": [
+          {
+            "at": "2026-06-21T04:02:26.888Z",
+            "action": "重点保护",
+            "note": "状态流转"
+          },
+          {
+            "at": "2026-06-21T04:02:01.044Z",
+            "action": "回滚",
+            "note": "测试回滚到初始版本"
+          },
+          {
+            "at": "2026-06-21T04:01:04.952Z",
+            "action": "更新",
+            "note": "更新为重点保护，调整基准温度"
+          },
+          {
+            "at": "2026-06-21T04:00:17.305Z",
+            "action": "创建",
+            "note": "测试审计功能"
+          }
+        ],
+        "cave": "北麓三号洞",
+        "zone": "测试区",
+        "pointCode": "TEST-001",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "重点保护",
+        "baselineTemp": 17,
+        "baselineHumidity": 85,
+        "baselineCo2": 600,
+        "note": "测试审计功能",
+        "operator": "测试用户"
+      },
+      "after": null,
+      "diff": {
+        "cave": {
+          "before": "北麓三号洞"
+        },
+        "zone": {
+          "before": "测试区"
+        },
+        "pointCode": {
+          "before": "TEST-001"
+        },
+        "route": {
+          "before": "东线巡测"
+        },
+        "sensitivity": {
+          "before": "中"
+        },
+        "protectedStatus": {
+          "before": "重点保护"
+        },
+        "baselineTemp": {
+          "before": 17
+        },
+        "baselineHumidity": {
+          "before": 85
+        },
+        "baselineCo2": {
+          "before": 600
+        },
+        "note": {
+          "before": "测试审计功能"
+        },
+        "operator": {
+          "before": "测试用户"
+        }
+      },
+      "note": "",
+      "operator": "删除测试员",
+      "createdAt": "2026-06-21T04:02:43.461Z"
+    },
+    {
+      "id": "audit-1782014546888-7359a",
+      "collection": "sites",
+      "recordId": "sites-1782014417305-7fa60",
+      "action": "action",
+      "actionLabel": "重点保护",
+      "before": {
+        "id": "sites-1782014417305-7fa60",
+        "createdAt": "2026-06-21T04:00:17.305Z",
+        "updatedAt": "2026-06-21T04:02:01.044Z",
+        "history": [
+          {
+            "at": "2026-06-21T04:02:01.044Z",
+            "action": "回滚",
+            "note": "测试回滚到初始版本"
+          },
+          {
+            "at": "2026-06-21T04:01:04.952Z",
+            "action": "更新",
+            "note": "更新为重点保护，调整基准温度"
+          },
+          {
+            "at": "2026-06-21T04:00:17.305Z",
+            "action": "创建",
+            "note": "测试审计功能"
+          }
+        ],
+        "cave": "北麓三号洞",
+        "zone": "测试区",
+        "pointCode": "TEST-001",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "常规观察",
+        "baselineTemp": 17,
+        "baselineHumidity": 85,
+        "baselineCo2": 600,
+        "note": "测试审计功能",
+        "operator": "测试用户"
+      },
+      "after": {
+        "id": "sites-1782014417305-7fa60",
+        "createdAt": "2026-06-21T04:00:17.305Z",
+        "updatedAt": "2026-06-21T04:02:26.888Z",
+        "history": [
+          {
+            "at": "2026-06-21T04:02:26.888Z",
+            "action": "重点保护",
+            "note": "状态流转"
+          },
+          {
+            "at": "2026-06-21T04:02:01.044Z",
+            "action": "回滚",
+            "note": "测试回滚到初始版本"
+          },
+          {
+            "at": "2026-06-21T04:01:04.952Z",
+            "action": "更新",
+            "note": "更新为重点保护，调整基准温度"
+          },
+          {
+            "at": "2026-06-21T04:00:17.305Z",
+            "action": "创建",
+            "note": "测试审计功能"
+          }
+        ],
+        "cave": "北麓三号洞",
+        "zone": "测试区",
+        "pointCode": "TEST-001",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "重点保护",
+        "baselineTemp": 17,
+        "baselineHumidity": 85,
+        "baselineCo2": 600,
+        "note": "测试审计功能",
+        "operator": "测试用户"
+      },
+      "diff": {
+        "protectedStatus": {
+          "before": "常规观察",
+          "after": "重点保护"
+        }
+      },
+      "note": "通过动作按钮标记为重点保护",
+      "operator": "动作测试员",
+      "createdAt": "2026-06-21T04:02:26.888Z"
+    },
+    {
+      "id": "audit-1782014521044-4a527",
+      "collection": "sites",
+      "recordId": "sites-1782014417305-7fa60",
+      "action": "rollback",
+      "actionLabel": "回滚",
+      "before": {
+        "id": "sites-1782014417305-7fa60",
+        "cave": "北麓三号洞",
+        "zone": "测试区",
+        "pointCode": "TEST-001",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "重点保护",
+        "baselineTemp": 16.5,
+        "baselineHumidity": 85,
+        "baselineCo2": 600,
+        "note": "更新为重点保护，调整基准温度",
+        "operator": "测试用户",
+        "createdAt": "2026-06-21T04:00:17.305Z",
+        "updatedAt": "2026-06-21T04:01:04.952Z",
+        "history": [
+          {
+            "at": "2026-06-21T04:01:04.952Z",
+            "action": "更新",
+            "note": "更新为重点保护，调整基准温度"
+          },
+          {
+            "at": "2026-06-21T04:00:17.305Z",
+            "action": "创建",
+            "note": "测试审计功能"
+          }
+        ]
+      },
+      "after": {
+        "id": "sites-1782014417305-7fa60",
+        "createdAt": "2026-06-21T04:00:17.305Z",
+        "updatedAt": "2026-06-21T04:02:01.044Z",
+        "history": [
+          {
+            "at": "2026-06-21T04:02:01.044Z",
+            "action": "回滚",
+            "note": "测试回滚到初始版本"
+          },
+          {
+            "at": "2026-06-21T04:01:04.952Z",
+            "action": "更新",
+            "note": "更新为重点保护，调整基准温度"
+          },
+          {
+            "at": "2026-06-21T04:00:17.305Z",
+            "action": "创建",
+            "note": "测试审计功能"
+          }
+        ],
+        "cave": "北麓三号洞",
+        "zone": "测试区",
+        "pointCode": "TEST-001",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "常规观察",
+        "baselineTemp": 17,
+        "baselineHumidity": 85,
+        "baselineCo2": 600,
+        "note": "测试审计功能",
+        "operator": "测试用户"
+      },
+      "diff": {
+        "protectedStatus": {
+          "before": "重点保护",
+          "after": "常规观察"
+        },
+        "baselineTemp": {
+          "before": 16.5,
+          "after": 17
+        },
+        "note": {
+          "before": "更新为重点保护，调整基准温度",
+          "after": "测试审计功能"
+        }
+      },
+      "note": "测试回滚到初始版本，源审计记录：audit-1782014417305-26ea9",
+      "operator": "管理员",
+      "createdAt": "2026-06-21T04:02:01.044Z"
+    },
+    {
+      "id": "audit-1782014464952-f166c",
+      "collection": "sites",
+      "recordId": "sites-1782014417305-7fa60",
+      "action": "update",
+      "actionLabel": "更新",
+      "before": {
+        "id": "sites-1782014417305-7fa60",
+        "cave": "北麓三号洞",
+        "zone": "测试区",
+        "pointCode": "TEST-001",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "常规观察",
+        "baselineTemp": 17,
+        "baselineHumidity": 85,
+        "baselineCo2": 600,
+        "note": "测试审计功能",
+        "operator": "测试用户",
+        "createdAt": "2026-06-21T04:00:17.305Z",
+        "updatedAt": "2026-06-21T04:00:17.305Z",
+        "history": [
+          {
+            "at": "2026-06-21T04:00:17.305Z",
+            "action": "创建",
+            "note": "测试审计功能"
+          }
+        ]
+      },
+      "after": {
+        "id": "sites-1782014417305-7fa60",
+        "cave": "北麓三号洞",
+        "zone": "测试区",
+        "pointCode": "TEST-001",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "重点保护",
+        "baselineTemp": 16.5,
+        "baselineHumidity": 85,
+        "baselineCo2": 600,
+        "note": "更新为重点保护，调整基准温度",
+        "operator": "测试用户",
+        "createdAt": "2026-06-21T04:00:17.305Z",
+        "updatedAt": "2026-06-21T04:01:04.952Z",
+        "history": [
+          {
+            "at": "2026-06-21T04:01:04.952Z",
+            "action": "更新",
+            "note": "更新为重点保护，调整基准温度"
+          },
+          {
+            "at": "2026-06-21T04:00:17.305Z",
+            "action": "创建",
+            "note": "测试审计功能"
+          }
+        ]
+      },
+      "diff": {
+        "protectedStatus": {
+          "before": "常规观察",
+          "after": "重点保护"
+        },
+        "baselineTemp": {
+          "before": 17,
+          "after": 16.5
+        },
+        "note": {
+          "before": "测试审计功能",
+          "after": "更新为重点保护，调整基准温度"
+        }
+      },
+      "note": "更新为重点保护，调整基准温度",
+      "operator": "管理员",
+      "createdAt": "2026-06-21T04:01:04.952Z"
+    },
+    {
+      "id": "audit-1782014417305-26ea9",
+      "collection": "sites",
+      "recordId": "sites-1782014417305-7fa60",
+      "action": "create",
+      "actionLabel": "创建",
+      "before": null,
+      "after": {
+        "id": "sites-1782014417305-7fa60",
+        "cave": "北麓三号洞",
+        "zone": "测试区",
+        "pointCode": "TEST-001",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "常规观察",
+        "baselineTemp": 17,
+        "baselineHumidity": 85,
+        "baselineCo2": 600,
+        "note": "测试审计功能",
+        "operator": "测试用户",
+        "createdAt": "2026-06-21T04:00:17.305Z",
+        "updatedAt": "2026-06-21T04:00:17.305Z",
+        "history": [
+          {
+            "at": "2026-06-21T04:00:17.305Z",
+            "action": "创建",
+            "note": "测试审计功能"
+          }
+        ]
+      },
+      "diff": {
+        "cave": {
+          "after": "北麓三号洞"
+        },
+        "zone": {
+          "after": "测试区"
+        },
+        "pointCode": {
+          "after": "TEST-001"
+        },
+        "route": {
+          "after": "东线巡测"
+        },
+        "sensitivity": {
+          "after": "中"
+        },
+        "protectedStatus": {
+          "after": "常规观察"
+        },
+        "baselineTemp": {
+          "after": 17
+        },
+        "baselineHumidity": {
+          "after": 85
+        },
+        "baselineCo2": {
+          "after": 600
+        },
+        "note": {
+          "after": "测试审计功能"
+        },
+        "operator": {
+          "after": "测试用户"
+        }
+      },
+      "note": "测试审计功能",
+      "operator": "测试用户",
+      "createdAt": "2026-06-21T04:00:17.305Z"
     }
   ]
 }

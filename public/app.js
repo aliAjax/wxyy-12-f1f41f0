@@ -8,7 +8,10 @@ const state = {
   activeZoneDetail: null,
   importCsvText: '',
   importPreviewData: null,
-  importResultData: null
+  importResultData: null,
+  auditLogs: [],
+  activeAuditRecord: null,
+  activeDiffLog: null
 };
 
 const DRAFT_STORAGE_KEY = 'wxyy_survey_drafts_v1';
@@ -285,6 +288,208 @@ function closePhotoModal() {
   $('#photoModal').classList.remove('show');
 }
 
+const AUDIT_ACTION_ICONS = {
+  create: '➕',
+  update: '✏️',
+  delete: '🗑️',
+  action: '🔄',
+  rollback: '↩️'
+};
+
+const AUDIT_ACTION_LABELS = {
+  create: '创建',
+  update: '更新',
+  delete: '删除',
+  action: '动作',
+  rollback: '回滚'
+};
+
+function formatValue(val) {
+  if (val === null || val === undefined) return '-';
+  if (typeof val === 'object') return JSON.stringify(val, null, 2);
+  return String(val);
+}
+
+function diffClass(log) {
+  if (!log || !log.diff) return '';
+  const keys = Object.keys(log.diff);
+  return keys.length > 0 ? 'has-diff' : 'no-diff';
+}
+
+async function loadAuditLogs(collection, id) {
+  try {
+    const logs = await api(`/api/audit-logs/${collection}/${id}`);
+    state.auditLogs = logs;
+    return logs;
+  } catch (err) {
+    toast(`加载审计日志失败：${err.message}`);
+    return [];
+  }
+}
+
+async function openAuditModal(collection, id, title) {
+  state.activeAuditRecord = { collection, id, title };
+  const logs = await loadAuditLogs(collection, id);
+  const item = state.db[collection]?.find((entry) => entry.id === id);
+  const site = item?.siteId ? state.db.sites?.find((s) => s.id === item.siteId) : null;
+  const siteLabel = site ? `${site.cave} / ${site.zone} / ${site.pointCode}` : '';
+  const fullTitle = `${title}${siteLabel ? ' · ' + siteLabel : ''}`;
+  $('#auditModalTitle').textContent = `审计时间线 - ${fullTitle}`;
+  $('#auditModalBody').innerHTML = renderAuditTimeline(logs, collection, id);
+  $('#auditModal').classList.add('show');
+}
+
+function closeAuditModal() {
+  $('#auditModal').classList.remove('show');
+  state.activeAuditRecord = null;
+  state.auditLogs = [];
+}
+
+function openDiffModal(logId) {
+  const log = state.auditLogs.find((l) => l.id === logId);
+  if (!log) return;
+  state.activeDiffLog = log;
+  $('#diffModalTitle').textContent = `变更详情 - ${log.actionLabel} (${fmtDate(log.createdAt)})`;
+  $('#diffModalBody').innerHTML = renderDiffView(log);
+  $('#diffModal').classList.add('show');
+}
+
+function closeDiffModal() {
+  $('#diffModal').classList.remove('show');
+  state.activeDiffLog = null;
+}
+
+function renderAuditTimeline(logs, collection, id) {
+  if (!logs.length) {
+    return `<div class="empty" style="padding:40px;text-align:center;">暂无审计记录</div>`;
+  }
+  const currentItem = state.db[collection]?.find((entry) => entry.id === id);
+  const rollbackNote = currentItem ? `确认回滚至该版本？此操作将生成新的审计记录。` : '';
+  return `
+    <div class="audit-timeline">
+      ${logs.map((log, index) => {
+        const isLatest = index === 0;
+        const canRollback = log.action !== 'delete' && !isLatest && currentItem;
+        const changeCount = Object.keys(log.diff || {}).length;
+        return `
+          <div class="audit-timeline-item ${diffClass(log)}" data-audit-log-id="${log.id}">
+            <div class="audit-timeline-marker">
+              <span class="audit-icon">${AUDIT_ACTION_ICONS[log.action] || '📝'}</span>
+            </div>
+            <div class="audit-timeline-content">
+              <div class="audit-timeline-head">
+                <div class="audit-timeline-title">
+                  <strong>${escapeHtml(log.actionLabel || AUDIT_ACTION_LABELS[log.action] || log.action)}</strong>
+                  ${isLatest ? '<span class="pill ok">当前版本</span>' : ''}
+                  ${changeCount > 0 ? `<span class="pill warn">${changeCount} 项变更</span>` : ''}
+                </div>
+                <div class="audit-timeline-meta">
+                  <span>${fmtDate(log.createdAt)}</span>
+                  <span>操作人：${escapeHtml(log.operator || 'system')}</span>
+                </div>
+              </div>
+              ${log.note ? `<div class="audit-timeline-note">${escapeHtml(log.note)}</div>` : ''}
+              ${changeCount > 0 ? `
+                <div class="audit-timeline-changes">
+                  ${Object.entries(log.diff).slice(0, 5).map(([key, val]) => `
+                    <div class="audit-change-mini">
+                      <span class="audit-change-field">${escapeHtml(key)}</span>
+                      <span class="audit-change-before" title="变更前">${escapeHtml(formatValue(val.before).slice(0, 30))}</span>
+                      <span class="audit-change-arrow">→</span>
+                      <span class="audit-change-after" title="变更后">${escapeHtml(formatValue(val.after).slice(0, 30))}</span>
+                    </div>
+                  `).join('')}
+                  ${changeCount > 5 ? `<div class="audit-more-changes">还有 ${changeCount - 5} 项变更…</div>` : ''}
+                </div>
+              ` : ''}
+              <div class="audit-timeline-actions">
+                <button class="secondary" data-view-diff="${log.id}">查看详细差异</button>
+                ${canRollback ? `<button class="danger" data-rollback="${log.id}" data-rollback-note="${escapeHtml(rollbackNote)}">回滚到此版本</button>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderDiffView(log) {
+  const diff = log.diff || {};
+  const keys = Object.keys(diff);
+  if (!keys.length) {
+    return `<div class="empty" style="padding:40px;text-align:center;">此操作无业务字段变更</div>`;
+  }
+  return `
+    <div class="diff-view">
+      <div class="diff-summary">
+        <div class="diff-summary-item">
+          <span class="diff-label">操作类型</span>
+          <span class="pill">${AUDIT_ACTION_ICONS[log.action] || ''} ${escapeHtml(log.actionLabel || AUDIT_ACTION_LABELS[log.action] || log.action)}</span>
+        </div>
+        <div class="diff-summary-item">
+          <span class="diff-label">操作时间</span>
+          <span>${fmtDate(log.createdAt)}</span>
+        </div>
+        <div class="diff-summary-item">
+          <span class="diff-label">操作人</span>
+          <span>${escapeHtml(log.operator || 'system')}</span>
+        </div>
+        <div class="diff-summary-item">
+          <span class="diff-label">变更字段</span>
+          <span class="pill warn">${keys.length} 项</span>
+        </div>
+        ${log.note ? `
+          <div class="diff-summary-item wide">
+            <span class="diff-label">备注</span>
+            <span>${escapeHtml(log.note)}</span>
+          </div>
+        ` : ''}
+      </div>
+      <div class="diff-table">
+        <div class="diff-table-head">
+          <div class="diff-col">字段</div>
+          <div class="diff-col diff-col-before">变更前</div>
+          <div class="diff-col diff-col-after">变更后</div>
+        </div>
+        ${keys.map((key) => {
+          const val = diff[key];
+          const beforeStr = formatValue(val.before);
+          const afterStr = formatValue(val.after);
+          return `
+            <div class="diff-table-row">
+              <div class="diff-col diff-field-name"><strong>${escapeHtml(key)}</strong></div>
+              <div class="diff-col diff-col-before"><pre>${escapeHtml(beforeStr)}</pre></div>
+              <div class="diff-col diff-col-after"><pre>${escapeHtml(afterStr)}</pre></div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+async function rollbackToLog(logId) {
+  const log = state.auditLogs.find((l) => l.id === logId);
+  if (!log) return;
+  const note = prompt(`回滚备注（可选）：\n\n将回滚至「${log.actionLabel}」(${fmtDate(log.createdAt)})\n确认后将生成新的审计记录。`, '');
+  if (note === null) return;
+  try {
+    const result = await api(`/api/audit-logs/${logId}/rollback`, {
+      method: 'POST',
+      body: JSON.stringify({ note: note || '' })
+    });
+    await load();
+    closeDiffModal();
+    if (state.activeAuditRecord) {
+      await openAuditModal(state.activeAuditRecord.collection, state.activeAuditRecord.id, state.activeAuditRecord.title);
+    }
+    toast('回滚成功，已生成新的审计记录');
+  } catch (err) {
+    toast(`回滚失败：${err.message}`);
+  }
+}
+
 function updatePhotoIndices(container) {
   const entries = container.querySelectorAll('.photo-entry');
   entries.forEach((entry, idx) => {
@@ -422,6 +627,7 @@ function renderCard(item, collection, view) {
     .filter((action) => action.collection === collection)
     .map((action) => `<button class="${action.danger ? 'danger' : 'ghost'}" data-action="${action.id}" data-id="${item.id}">${escapeHtml(action.label)}</button>`)
     .join('');
+  const auditBtn = `<button class="ghost" data-audit-history="${collection}:${item.id}" data-audit-title="${escapeHtml(title)}">📋 审计历史</button>`;
   return `<article class="card">
     <div class="card-head"><h3>${escapeHtml(title)}</h3><div class="card-head-right">${statusValue ? pill(statusValue, toneFor(statusValue)) : ''}${photosBadgeHtml(item, collection)}</div></div>
     ${relation}
@@ -429,7 +635,7 @@ function renderCard(item, collection, view) {
     ${summary ? `<p>${escapeHtml(summary)}</p>` : ''}
     ${autoRiskHtml(item)}
     ${details ? `<div class="detail">${details}</div>` : ''}
-    ${actions ? `<div class="actions">${actions}</div>` : ''}
+    <div class="actions">${actions}${auditBtn}</div>
     ${historyHtml(item)}
   </article>`;
 }
@@ -1123,6 +1329,11 @@ document.addEventListener('click', async (event) => {
   const removePhotoBtn = event.target.closest('.remove-photo-btn');
   const viewPhotosBtn = event.target.closest('[data-view-photos]');
   const closeModal = event.target.closest('[data-close-modal]');
+  const closeAudit = event.target.closest('[data-close-audit]');
+  const closeDiff = event.target.closest('[data-close-diff]');
+  const auditHistoryBtn = event.target.closest('[data-audit-history]');
+  const viewDiffBtn = event.target.closest('[data-view-diff]');
+  const rollbackBtn = event.target.closest('[data-rollback]');
   const saveDraftBtn = event.target.closest('[data-save-draft]');
   const draftEditBtn = event.target.closest('[data-draft-edit]');
   const draftSubmitBtn = event.target.closest('[data-draft-submit]');
@@ -1164,6 +1375,27 @@ document.addEventListener('click', async (event) => {
   }
   if (closeModal) {
     closePhotoModal();
+  }
+  if (closeAudit) {
+    closeAuditModal();
+  }
+  if (closeDiff) {
+    closeDiffModal();
+  }
+  if (auditHistoryBtn) {
+    const [collection, id] = auditHistoryBtn.dataset.auditHistory.split(':');
+    const title = auditHistoryBtn.dataset.auditTitle || id;
+    await openAuditModal(collection, id, title);
+  }
+  if (viewDiffBtn) {
+    openDiffModal(viewDiffBtn.dataset.viewDiff);
+  }
+  if (rollbackBtn) {
+    const logId = rollbackBtn.dataset.rollback;
+    const note = rollbackBtn.dataset.rollbackNote || '';
+    if (confirm(note || '确认回滚到此版本？')) {
+      await rollbackToLog(logId);
+    }
   }
   if (saveDraftBtn) {
     const form = saveDraftBtn.closest('[data-create]');
@@ -1333,6 +1565,8 @@ $('#refreshBtn').addEventListener('click', () => load().then(() => toast('已刷
 document.addEventListener('keydown', async (event) => {
   if (event.key === 'Escape') {
     closePhotoModal();
+    closeAuditModal();
+    closeDiffModal();
   }
   const zoneCard = event.target.closest('.zone-card');
   if (zoneCard && (event.key === 'Enter' || event.key === ' ')) {

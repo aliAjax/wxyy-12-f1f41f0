@@ -4,6 +4,7 @@ const path = require('path');
 
 const app = express();
 const config = require('./project.config');
+const audit = require('./utils/audit');
 const PORT = process.env.PORT || config.port || 3900;
 const DB_FILE = path.join(__dirname, 'data', 'db.json');
 
@@ -144,6 +145,17 @@ app.post('/api/:collection', async (req, res) => {
     const riskNote = risk.autoRiskLevel !== '正常' ? `自动判定：${risk.autoRiskLevel}（${risk.autoRiskReasons.join('；')}）` : '自动判定：正常';
     item.history[0] = stamp('创建', `${req.body.note || req.body.memo || ''}${req.body.note || req.body.memo ? '；' : ''}${riskNote}`);
   }
+  audit.createAuditLog({
+    db,
+    collection,
+    recordId: item.id,
+    action: audit.AUDIT_TYPES.CREATE,
+    actionLabel: '创建',
+    before: null,
+    after: item,
+    note: req.body.note || req.body.memo || '',
+    operator: req.body.operator || req.headers['x-operator'] || 'system'
+  });
   db[collection].push(item);
   await writeDb(db);
   res.status(201).json(item);
@@ -155,8 +167,11 @@ app.patch('/api/:collection/:id', async (req, res) => {
   if (!Array.isArray(db[collection])) return res.status(404).json({ error: 'unknown collection' });
   const item = db[collection].find((entry) => entry.id === id);
   if (!item) return res.status(404).json({ error: 'not found' });
+  const beforeUpdate = JSON.parse(JSON.stringify(item));
   const historyAction = req.body.historyAction;
+  const operator = req.body.operator || req.headers['x-operator'] || 'system';
   delete req.body.historyAction;
+  delete req.body.operator;
   const thresholdRules = getThresholdRules(db);
   const oldStatus = item.status;
   Object.assign(item, req.body, { updatedAt: new Date().toISOString() });
@@ -179,9 +194,21 @@ app.patch('/api/:collection/:id', async (req, res) => {
     }
   }
   item.history = item.history || [];
-  if (historyAction || req.body.note || req.body.memo || req.body.status) {
-    item.history.unshift(stamp(historyAction || req.body.status || '更新', req.body.note || req.body.memo || ''));
+  const historyNote = req.body.note || req.body.memo || '';
+  if (historyAction || historyNote || req.body.status) {
+    item.history.unshift(stamp(historyAction || req.body.status || '更新', historyNote));
   }
+  audit.createAuditLog({
+    db,
+    collection,
+    recordId: id,
+    action: audit.AUDIT_TYPES.UPDATE,
+    actionLabel: historyAction || '更新',
+    before: beforeUpdate,
+    after: item,
+    note: historyNote,
+    operator
+  });
   await writeDb(db);
   res.json(item);
 });
@@ -190,9 +217,23 @@ app.delete('/api/:collection/:id', async (req, res) => {
   const db = await readDb();
   const { collection, id } = req.params;
   if (!Array.isArray(db[collection])) return res.status(404).json({ error: 'unknown collection' });
+  const item = db[collection].find((entry) => entry.id === id);
+  if (!item) return res.status(404).json({ error: 'not found' });
+  const beforeDelete = JSON.parse(JSON.stringify(item));
   const before = db[collection].length;
   db[collection] = db[collection].filter((entry) => entry.id !== id);
   if (db[collection].length === before) return res.status(404).json({ error: 'not found' });
+  audit.createAuditLog({
+    db,
+    collection,
+    recordId: id,
+    action: audit.AUDIT_TYPES.DELETE,
+    actionLabel: '删除',
+    before: beforeDelete,
+    after: null,
+    note: req.body?.note || '',
+    operator: req.body?.operator || req.headers['x-operator'] || 'system'
+  });
   await writeDb(db);
   res.status(204).end();
 });
@@ -203,7 +244,9 @@ app.post('/api/action/:actionId/:id', async (req, res) => {
   if (!action) return res.status(404).json({ error: 'unknown action' });
   const item = db[action.collection]?.find((entry) => entry.id === req.params.id);
   if (!item) return res.status(404).json({ error: 'not found' });
-  const result = runAction(db, action, item);
+  const operator = req.body?.operator || req.headers['x-operator'] || 'system';
+  const note = req.body?.note || '';
+  const result = runAction(db, action, item, operator, note);
   if (result.error) return res.status(409).json({ error: result.error });
   await writeDb(db);
   res.json(result.item);
@@ -228,7 +271,7 @@ function findRelated(db, relation, item) {
   return db[relation.collection]?.find((entry) => entry.id === item[relation.localKey]);
 }
 
-function runAction(db, action, item) {
+function runAction(db, action, item, operator, note) {
   const related = action.relation ? findRelated(db, action.relation, item) : null;
   const context = { item, related };
   const levelRank = { '低': 1, '中': 2, '高': 3, '一般': 1, '严重': 2, '紧急': 3 };
@@ -243,12 +286,14 @@ function runAction(db, action, item) {
     if (guard.op === 'levelGte' && (levelRank[left] || 0) < (levelRank[right] || 0)) return { error: guard.message };
     if (guard.op === 'notIn' && guard.values.includes(left)) return { error: guard.message };
   }
+  const beforeItem = item ? JSON.parse(JSON.stringify(item)) : null;
+  const beforeRelated = related ? JSON.parse(JSON.stringify(related)) : null;
   const stamped = new WeakSet();
-  function stampOnce(target, note) {
+  function stampOnce(target, actionNote) {
     if (!target || stamped.has(target)) return;
     target.updatedAt = new Date().toISOString();
     target.history = target.history || [];
-    target.history.unshift(stamp(action.label, note || '状态流转'));
+    target.history.unshift(stamp(action.label, actionNote || '状态流转'));
     stamped.add(target);
   }
   for (const patch of action.patches || []) {
@@ -270,6 +315,32 @@ function runAction(db, action, item) {
     const current = Number(getValue({ target }, `target.${delta.field}`) || 0);
     setValue(target, delta.field, current + amount);
     stampOnce(target, action.note || '数量调整');
+  }
+  if (stamped.has(item) && beforeItem) {
+    audit.createAuditLog({
+      db,
+      collection: action.collection,
+      recordId: item.id,
+      action: audit.AUDIT_TYPES.ACTION,
+      actionLabel: action.label,
+      before: beforeItem,
+      after: item,
+      note: note || action.note || '状态流转',
+      operator
+    });
+  }
+  if (stamped.has(related) && beforeRelated && action.relation) {
+    audit.createAuditLog({
+      db,
+      collection: action.relation.collection,
+      recordId: related.id,
+      action: audit.AUDIT_TYPES.ACTION,
+      actionLabel: action.label,
+      before: beforeRelated,
+      after: related,
+      note: `${note || action.note || '状态流转'}（关联操作）`,
+      operator
+    });
   }
   return { item };
 }
@@ -642,6 +713,36 @@ app.post('/api/surveys/import', async (req, res) => {
     failed: failedItems.length,
     successItems,
     failedItems
+  });
+});
+
+app.get('/api/audit-logs/:collection/:id', async (req, res) => {
+  const db = await readDb();
+  const { collection, id } = req.params;
+  if (!Array.isArray(db[collection])) return res.status(404).json({ error: 'unknown collection' });
+  const logs = audit.getAuditLogsForRecord(db, collection, id);
+  res.json(logs);
+});
+
+app.get('/api/audit-logs/:logId', async (req, res) => {
+  const db = await readDb();
+  const log = audit.getAuditLogById(db, req.params.logId);
+  if (!log) return res.status(404).json({ error: 'audit log not found' });
+  res.json(log);
+});
+
+app.post('/api/audit-logs/:logId/rollback', async (req, res) => {
+  const db = await readDb();
+  const { logId } = req.params;
+  const { note } = req.body || {};
+  const operator = req.body?.operator || req.headers['x-operator'] || 'system';
+  const result = audit.rollbackToAuditLog(db, logId, note, operator);
+  if (result.error) return res.status(400).json({ error: result.error });
+  await writeDb(db);
+  res.json({
+    item: result.item,
+    auditLog: result.auditLog,
+    sourceLog: result.sourceLog
   });
 });
 
