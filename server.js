@@ -594,7 +594,17 @@ function runAction(db, action, item, operator, note) {
           before: beforeReview,
           after: linkedReview,
           note: `关联干扰事件 ${item.id} 已${completedLabel}，已生成复查提示（未覆盖人工结果）`,
-          operator
+          operator,
+          relatedImpacts: [
+            {
+              collection: 'incidents',
+              recordId: item.id,
+              relationLabel: '触发事件',
+              impactType: audit.IMPACT_TYPES.CASCADE,
+              description: `由干扰事件「${item.eventType}」${completedLabel}触发`,
+              recordLabel: [item.eventType, item.reporter].filter(Boolean).join(' / ')
+            }
+          ]
         });
       }
     }
@@ -625,7 +635,17 @@ function runAction(db, action, item, operator, note) {
           before: beforeSite,
           after: site,
           note: `${hintMsg}（仅作提示，未自动修改保护状态）`,
-          operator
+          operator,
+          relatedImpacts: [
+            {
+              collection: 'incidents',
+              recordId: item.id,
+              relationLabel: '触发事件',
+              impactType: audit.IMPACT_TYPES.CASCADE,
+              description: `由${item.severity}干扰事件「${item.eventType}」${completedLabel}触发提示`,
+              recordLabel: [item.eventType, item.reporter].filter(Boolean).join(' / ')
+            }
+          ]
         });
       }
     }
@@ -635,6 +655,39 @@ function runAction(db, action, item, operator, note) {
   }
 
   if (stamped.has(item) && beforeItem) {
+    const extraImpacts = [];
+    if (stamped.has(related) && action.relation) {
+      extraImpacts.push({
+        collection: action.relation.collection,
+        recordId: related.id,
+        relationLabel: action.relation.label || '关联记录',
+        impactType: audit.IMPACT_TYPES.CASCADE,
+        description: `同步修改了关联记录`,
+        recordLabel: audit._getRecordLabel(action.relation.collection, related)
+      });
+    }
+    if (isIncidentComplete && (linkHints.review || linkHints.site)) {
+      if (linkHints.review) {
+        extraImpacts.push({
+          collection: 'reviews',
+          recordId: linkHints.review,
+          relationLabel: '联动复查',
+          impactType: audit.IMPACT_TYPES.HINT,
+          description: '已发送事件联动提示',
+          recordLabel: audit._getRecordLabel('reviews', db.reviews?.find((r) => r.id === linkHints.review))
+        });
+      }
+      if (linkHints.site) {
+        extraImpacts.push({
+          collection: 'sites',
+          recordId: linkHints.site,
+          relationLabel: '关联样点',
+          impactType: audit.IMPACT_TYPES.HINT,
+          description: '已发送事件联动提示',
+          recordLabel: audit._getRecordLabel('sites', db.sites?.find((s) => s.id === linkHints.site))
+        });
+      }
+    }
     audit.createAuditLog({
       db,
       collection: action.collection,
@@ -644,7 +697,8 @@ function runAction(db, action, item, operator, note) {
       before: beforeItem,
       after: item,
       note: note || action.note || '状态流转',
-      operator
+      operator,
+      relatedImpacts: extraImpacts.length ? extraImpacts : undefined
     });
   }
   if (stamped.has(related) && beforeRelated && action.relation) {
@@ -657,7 +711,17 @@ function runAction(db, action, item, operator, note) {
       before: beforeRelated,
       after: related,
       note: `${note || action.note || '状态流转'}（关联操作）`,
-      operator
+      operator,
+      relatedImpacts: [
+        {
+          collection: action.collection,
+          recordId: item.id,
+          relationLabel: '触发操作',
+          impactType: audit.IMPACT_TYPES.CASCADE,
+          description: `由${action.label}操作联动修改`,
+          recordLabel: audit._getRecordLabel(action.collection, item)
+        }
+      ]
     });
   }
   return { item };
@@ -1455,14 +1519,30 @@ app.get('/api/audit-logs/:collection/:id', authMiddleware, requirePermission('au
   const { collection, id } = req.params;
   if (!Array.isArray(db[collection])) return res.status(404).json({ error: 'unknown collection' });
   const logs = audit.getAuditLogsForRecord(db, collection, id);
-  res.json(logs);
+  const enrichedLogs = logs.map((log) => audit.enrichAuditLogWithImpactDetails(db, log));
+  const incomingImpacts = audit.getIncomingImpacts(db, collection, id);
+  const enrichedIncoming = incomingImpacts.map((log) => audit.enrichAuditLogWithImpactDetails(db, log));
+  res.json({
+    logs: enrichedLogs,
+    incomingImpacts: enrichedIncoming
+  });
 });
 
 app.get('/api/audit-logs/:logId', authMiddleware, requirePermission('audit:view'), async (req, res) => {
   const db = req.db;
   const log = audit.getAuditLogById(db, req.params.logId);
   if (!log) return res.status(404).json({ error: 'audit log not found' });
-  res.json(log);
+  const enriched = audit.enrichAuditLogWithImpactDetails(db, log);
+  res.json(enriched);
+});
+
+app.get('/api/audit-logs/:collection/:id/incoming-impacts', authMiddleware, requirePermission('audit:view'), async (req, res) => {
+  const db = req.db;
+  const { collection, id } = req.params;
+  if (!Array.isArray(db[collection])) return res.status(404).json({ error: 'unknown collection' });
+  const incomingImpacts = audit.getIncomingImpacts(db, collection, id);
+  const enriched = incomingImpacts.map((log) => audit.enrichAuditLogWithImpactDetails(db, log));
+  res.json(enriched);
 });
 
 app.post('/api/audit-logs/:logId/rollback', authMiddleware, requirePermission('audit:rollback'), async (req, res) => {

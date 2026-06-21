@@ -479,24 +479,19 @@ function diffClass(log) {
 
 async function loadAuditLogs(collection, id) {
   try {
-    const logs = await api(`/api/audit-logs/${collection}/${id}`);
-    state.auditLogs = logs;
-    return logs;
+    const result = await api(`/api/audit-logs/${collection}/${id}`);
+    state.auditLogs = result.logs || result || [];
+    state.auditIncomingImpacts = result.incomingImpacts || [];
+    return { logs: state.auditLogs, incomingImpacts: state.auditIncomingImpacts };
   } catch (err) {
     toast(`加载审计日志失败：${err.message}`);
-    return [];
+    return { logs: [], incomingImpacts: [] };
   }
 }
 
 async function openAuditModal(collection, id, title) {
   state.activeAuditRecord = { collection, id, title };
-  const logs = await loadAuditLogs(collection, id);
-  const item = state.db[collection]?.find((entry) => entry.id === id);
-  const site = item?.siteId ? state.db.sites?.find((s) => s.id === item.siteId) : null;
-  const siteLabel = site ? `${site.cave} / ${site.zone} / ${site.pointCode}` : '';
-  const fullTitle = `${title}${siteLabel ? ' · ' + siteLabel : ''}`;
-  $('#auditModalTitle').textContent = `审计时间线 - ${fullTitle}`;
-  $('#auditModalBody').innerHTML = renderAuditTimeline(logs, collection, id);
+  await refreshAuditView();
   $('#auditModal').classList.add('show');
 }
 
@@ -504,6 +499,8 @@ function closeAuditModal() {
   $('#auditModal').classList.remove('show');
   state.activeAuditRecord = null;
   state.auditLogs = [];
+  state.auditIncomingImpacts = [];
+  state.auditModalStack = [];
 }
 
 function openDiffModal(logId) {
@@ -520,18 +517,136 @@ function closeDiffModal() {
   state.activeDiffLog = null;
 }
 
-function renderAuditTimeline(logs, collection, id) {
-  if (!logs.length) {
+const IMPACT_TYPE_LABELS = {
+  direct: '仅关联',
+  cascade: '级联影响',
+  hint: '联动提示',
+  reverse: '反向影响'
+};
+
+const IMPACT_TYPE_TONES = {
+  direct: 'ok',
+  cascade: 'warn',
+  hint: 'warn',
+  reverse: 'bad'
+};
+
+function collectionLabelShort(collection) {
+  const map = {
+    sites: '样点',
+    surveys: '巡测',
+    plans: '计划',
+    reviews: '复查',
+    incidents: '事件'
+  };
+  return map[collection] || collection;
+}
+
+function renderRelatedImpacts(impacts) {
+  if (!impacts || !impacts.length) return '';
+  return `
+    <div class="audit-related-impacts">
+      <div class="audit-related-impacts-title">
+        <span class="audit-related-icon">🔗</span>
+        <span>关联影响</span>
+        <span class="pill">${impacts.length} 项</span>
+      </div>
+      <div class="audit-related-impacts-list">
+        ${impacts.map((impact) => {
+          const tone = IMPACT_TYPE_TONES[impact.impactType] || '';
+          const label = impact.recordLabel || impact.recordId || '';
+          const isMulti = impact.recordLabels && impact.recordLabels.length > 0;
+          const canJump = impact.recordId && impact.collection;
+          return `
+            <div class="audit-related-impact-item ${tone}">
+              <div class="audit-related-impact-head">
+                <span class="pill ${tone}">${IMPACT_TYPE_LABELS[impact.impactType] || impact.impactType}</span>
+                <span class="audit-related-collection">${collectionLabelShort(impact.collection)}</span>
+              </div>
+              <div class="audit-related-impact-description">${escapeHtml(impact.description || impact.relationLabel || '')}</div>
+              ${isMulti ? `
+                <div class="audit-related-impact-records">
+                  ${impact.recordLabels.map((r) => `
+                    <span class="audit-related-record">${escapeHtml(r.label || r.id)}</span>
+                  `).join('')}
+                </div>
+              ` : ''}
+              ${!isMulti && label ? `
+                ${canJump ? `
+                  <button class="ghost small audit-jump-btn"
+                    data-jump-collection="${impact.collection}"
+                    data-jump-id="${impact.recordId}"
+                    data-jump-title="${escapeHtml(label)}">
+                    📋 ${escapeHtml(label)}
+                  </button>
+                ` : `<span class="audit-related-record-single">${escapeHtml(label)}</span>`}
+              ` : ''}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderIncomingImpacts(incomingImpacts, currentCollection, currentId) {
+  if (!incomingImpacts || !incomingImpacts.length) return '';
+  return `
+    <div class="audit-incoming-section">
+      <div class="audit-incoming-title">
+        <span class="audit-incoming-icon">📥</span>
+        <span>受其他操作影响</span>
+        <span class="pill warn">${incomingImpacts.length} 条</span>
+      </div>
+      <div class="audit-incoming-list">
+        ${incomingImpacts.slice(0, 5).map((log) => {
+          const changeCount = Object.keys(log.diff || {}).length;
+          return `
+            <div class="audit-incoming-item" data-incoming-log-id="${log.id}">
+              <div class="audit-incoming-head">
+                <span class="audit-incoming-icon">${AUDIT_ACTION_ICONS[log.action] || '📝'}</span>
+                <div class="audit-incoming-info">
+                  <div class="audit-incoming-title-row">
+                    <strong>${escapeHtml(log.actionLabel || log.action)}</strong>
+                    <span class="pill ok">${collectionLabelShort(log.collection)}</span>
+                  </div>
+                  <div class="audit-incoming-meta">
+                    <span>${fmtDate(log.createdAt)}</span>
+                    <span>操作人：${escapeHtml(log.operator || 'system')}</span>
+                    ${changeCount > 0 ? `<span>${changeCount} 项变更</span>` : ''}
+                  </div>
+                </div>
+                <button class="ghost small audit-jump-btn"
+                  data-jump-collection="${log.collection}"
+                  data-jump-id="${log.recordId}"
+                  data-jump-title="${escapeHtml(log.actionLabel || log.action)}">
+                  查看 →
+                </button>
+              </div>
+              ${log.note ? `<div class="audit-incoming-note">${escapeHtml(log.note)}</div>` : ''}
+            </div>
+          `;
+        }).join('')}
+        ${incomingImpacts.length > 5 ? `<div class="audit-incoming-more">还有 ${incomingImpacts.length - 5} 条影响记录…</div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderAuditTimeline(logs, incomingImpacts, collection, id) {
+  if (!logs.length && (!incomingImpacts || !incomingImpacts.length)) {
     return `<div class="empty" style="padding:40px;text-align:center;">暂无审计记录</div>`;
   }
   const currentItem = state.db[collection]?.find((entry) => entry.id === id);
   const rollbackNote = currentItem ? `确认将记录恢复到本次操作完成后的状态？此操作将生成新的审计记录。` : '';
   return `
+    ${renderIncomingImpacts(incomingImpacts, collection, id)}
     <div class="audit-timeline">
       ${logs.map((log, index) => {
         const isLatest = index === 0;
         const canRollback = log.action !== 'delete' && !isLatest && currentItem;
         const changeCount = Object.keys(log.diff || {}).length;
+        const hasImpacts = log.relatedImpacts && log.relatedImpacts.length > 0;
         return `
           <div class="audit-timeline-item ${diffClass(log)}" data-audit-log-id="${log.id}">
             <div class="audit-timeline-marker">
@@ -543,6 +658,7 @@ function renderAuditTimeline(logs, collection, id) {
                   <strong>${escapeHtml(log.actionLabel || AUDIT_ACTION_LABELS[log.action] || log.action)}</strong>
                   ${isLatest ? '<span class="pill ok">当前版本</span>' : ''}
                   ${changeCount > 0 ? `<span class="pill warn">${changeCount} 项变更</span>` : ''}
+                  ${hasImpacts ? `<span class="pill">🔗 ${log.relatedImpacts.length} 项关联</span>` : ''}
                 </div>
                 <div class="audit-timeline-meta">
                   <span>${fmtDate(log.createdAt)}</span>
@@ -550,6 +666,7 @@ function renderAuditTimeline(logs, collection, id) {
                 </div>
               </div>
               ${log.note ? `<div class="audit-timeline-note">${escapeHtml(log.note)}</div>` : ''}
+              ${renderRelatedImpacts(log.relatedImpacts)}
               ${changeCount > 0 ? `
                 <div class="audit-timeline-changes">
                   ${Object.entries(log.diff).slice(0, 5).map(([key, val]) => `
@@ -578,9 +695,7 @@ function renderAuditTimeline(logs, collection, id) {
 function renderDiffView(log) {
   const diff = log.diff || {};
   const keys = Object.keys(diff);
-  if (!keys.length) {
-    return `<div class="empty" style="padding:40px;text-align:center;">此操作无业务字段变更</div>`;
-  }
+  const hasImpacts = log.relatedImpacts && log.relatedImpacts.length > 0;
   return `
     <div class="diff-view">
       <div class="diff-summary">
@@ -600,6 +715,12 @@ function renderDiffView(log) {
           <span class="diff-label">变更字段</span>
           <span class="pill warn">${keys.length} 项</span>
         </div>
+        ${hasImpacts ? `
+          <div class="diff-summary-item">
+            <span class="diff-label">关联影响</span>
+            <span class="pill">🔗 ${log.relatedImpacts.length} 项</span>
+          </div>
+        ` : ''}
         ${log.note ? `
           <div class="diff-summary-item wide">
             <span class="diff-label">备注</span>
@@ -607,27 +728,64 @@ function renderDiffView(log) {
           </div>
         ` : ''}
       </div>
-      <div class="diff-table">
-        <div class="diff-table-head">
-          <div class="diff-col">字段</div>
-          <div class="diff-col diff-col-before">变更前</div>
-          <div class="diff-col diff-col-after">变更后</div>
+      ${hasImpacts ? renderRelatedImpacts(log.relatedImpacts) : ''}
+      ${!keys.length ? `
+        <div class="empty" style="padding:30px;text-align:center;">此操作无业务字段变更</div>
+      ` : `
+        <div class="diff-table">
+          <div class="diff-table-head">
+            <div class="diff-col">字段</div>
+            <div class="diff-col diff-col-before">变更前</div>
+            <div class="diff-col diff-col-after">变更后</div>
+          </div>
+          ${keys.map((key) => {
+            const val = diff[key];
+            const beforeStr = formatValue(val.before);
+            const afterStr = formatValue(val.after);
+            return `
+              <div class="diff-table-row">
+                <div class="diff-col diff-field-name"><strong>${escapeHtml(key)}</strong></div>
+                <div class="diff-col diff-col-before"><pre>${escapeHtml(beforeStr)}</pre></div>
+                <div class="diff-col diff-col-after"><pre>${escapeHtml(afterStr)}</pre></div>
+              </div>
+            `;
+          }).join('')}
         </div>
-        ${keys.map((key) => {
-          const val = diff[key];
-          const beforeStr = formatValue(val.before);
-          const afterStr = formatValue(val.after);
-          return `
-            <div class="diff-table-row">
-              <div class="diff-col diff-field-name"><strong>${escapeHtml(key)}</strong></div>
-              <div class="diff-col diff-col-before"><pre>${escapeHtml(beforeStr)}</pre></div>
-              <div class="diff-col diff-col-after"><pre>${escapeHtml(afterStr)}</pre></div>
-            </div>
-          `;
-        }).join('')}
-      </div>
+      `}
     </div>
   `;
+}
+
+async function jumpToRelatedAudit(collection, id, title) {
+  const collConfig = state.config.collections?.[collection];
+  const displayTitle = collConfig?.label ? `${collConfig.label} - ${title}` : title;
+  state.auditModalStack = state.auditModalStack || [];
+  state.auditModalStack.push({ ...state.activeAuditRecord });
+  await openAuditModal(collection, id, displayTitle);
+}
+
+async function refreshAuditView() {
+  if (!state.activeAuditRecord) return;
+  const { collection, id, title } = state.activeAuditRecord;
+  const { logs, incomingImpacts } = await loadAuditLogs(collection, id);
+  const item = state.db[collection]?.find((entry) => entry.id === id);
+  const site = item?.siteId ? state.db.sites?.find((s) => s.id === item.siteId) : null;
+  const siteLabel = site ? `${site.cave} / ${site.zone} / ${site.pointCode}` : '';
+  const fullTitle = `${title}${siteLabel ? ' · ' + siteLabel : ''}`;
+  $('#auditModalTitle').textContent = `审计时间线 - ${fullTitle}`;
+  $('#auditModalBody').innerHTML = renderAuditTimeline(logs, incomingImpacts, collection, id);
+  const hasStack = state.auditModalStack && state.auditModalStack.length > 0;
+  $('#auditBackBtn').style.display = hasStack ? '' : 'none';
+}
+
+async function goBackAuditStack() {
+  if (!state.auditModalStack || !state.auditModalStack.length) {
+    closeAuditModal();
+    return;
+  }
+  const prev = state.auditModalStack.pop();
+  state.activeAuditRecord = prev;
+  await refreshAuditView();
 }
 
 async function rollbackToLog(logId) {
@@ -643,7 +801,7 @@ async function rollbackToLog(logId) {
     await load();
     closeDiffModal();
     if (state.activeAuditRecord) {
-      await openAuditModal(state.activeAuditRecord.collection, state.activeAuditRecord.id, state.activeAuditRecord.title);
+      await refreshAuditView();
     }
     toast('回滚成功，已生成新的审计记录');
   } catch (err) {
@@ -2263,6 +2421,8 @@ document.addEventListener('click', async (event) => {
   const auditHistoryBtn = event.target.closest('[data-audit-history]');
   const viewDiffBtn = event.target.closest('[data-view-diff]');
   const rollbackBtn = event.target.closest('[data-rollback]');
+  const jumpAuditBtn = event.target.closest('.audit-jump-btn');
+  const backAuditBtn = event.target.closest('[data-back-audit]');
   const saveDraftBtn = event.target.closest('[data-save-draft]');
   const draftEditBtn = event.target.closest('[data-draft-edit]');
   const draftSubmitBtn = event.target.closest('[data-draft-submit]');
@@ -2353,6 +2513,18 @@ document.addEventListener('click', async (event) => {
     if (confirm(note || '确认将记录恢复到本次操作完成后的状态？')) {
       await rollbackToLog(logId);
     }
+  }
+  if (jumpAuditBtn) {
+    const collection = jumpAuditBtn.dataset.jumpCollection;
+    const id = jumpAuditBtn.dataset.jumpId;
+    const title = jumpAuditBtn.dataset.jumpTitle || id;
+    closeDiffModal();
+    await jumpToRelatedAudit(collection, id, title);
+    return;
+  }
+  if (backAuditBtn) {
+    await goBackAuditStack();
+    return;
   }
   if (saveDraftBtn) {
     const form = saveDraftBtn.closest('[data-create]');

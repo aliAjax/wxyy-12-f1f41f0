@@ -141,14 +141,24 @@
       "pointCode": "A-01",
       "route": "东线巡测",
       "sensitivity": "中",
-      "protectedStatus": "常规观察",
+      "protectedStatus": "重点保护",
       "baselineTemp": 17.5,
       "baselineHumidity": 85,
       "baselineCo2": 550,
       "note": "洞穴入口，温度波动较大",
       "createdAt": "2026-06-14T08:10:00.000Z",
-      "updatedAt": "2026-06-14T08:10:00.000Z",
+      "updatedAt": "2026-06-21T13:19:38.535Z",
       "history": [
+        {
+          "at": "2026-06-21T13:19:38.535Z",
+          "action": "标记异常",
+          "note": "状态流转"
+        },
+        {
+          "at": "2026-06-21T13:12:02.728Z",
+          "action": "标记异常",
+          "note": "状态流转"
+        },
         {
           "at": "2026-06-14T08:10:00.000Z",
           "action": "创建",
@@ -496,6 +506,30 @@
     },
     {
       "id": "survey-seed-2",
+      "createdAt": "2026-06-19T09:30:00.000Z",
+      "updatedAt": "2026-06-21T13:26:00.404Z",
+      "history": [
+        {
+          "at": "2026-06-21T13:26:00.404Z",
+          "action": "回滚",
+          "note": "恢复到「标记异常」(2026-06-21T13:12:02.728Z) 操作完成后的状态"
+        },
+        {
+          "at": "2026-06-21T13:19:38.535Z",
+          "action": "标记异常",
+          "note": "状态流转"
+        },
+        {
+          "at": "2026-06-21T13:12:02.728Z",
+          "action": "标记异常",
+          "note": "状态流转"
+        },
+        {
+          "at": "2026-06-19T09:30:00.000Z",
+          "action": "创建",
+          "note": "例行巡测，一切正常"
+        }
+      ],
       "siteId": "site-seed-2",
       "surveyor": "李明",
       "date": "2026-06-19",
@@ -505,22 +539,14 @@
       "dripRate": 0,
       "disturbance": "",
       "photos": [],
-      "status": "正常",
+      "status": "异常待复查",
       "autoRiskLevel": "正常",
       "autoRiskReasons": [],
       "deviationTemp": 0.3,
       "deviationHumidity": 1,
       "deviationCo2": 10,
       "reviewNote": "",
-      "createdAt": "2026-06-19T09:30:00.000Z",
-      "updatedAt": "2026-06-19T09:30:00.000Z",
-      "history": [
-        {
-          "at": "2026-06-19T09:30:00.000Z",
-          "action": "创建",
-          "note": "例行巡测，一切正常"
-        }
-      ]
+      "manuallyReviewed": true
     },
     {
       "id": "survey-seed-3",
@@ -881,5 +907,440 @@
       ]
     }
   ],
-  "auditLogs": []
+  "auditLogs": [
+    {
+      "id": "audit-1782048360404-bd639",
+      "collection": "surveys",
+      "recordId": "survey-seed-2",
+      "action": "rollback",
+      "actionLabel": "回滚",
+      "before": {
+        "id": "survey-seed-2",
+        "siteId": "site-seed-2",
+        "surveyor": "李明",
+        "date": "2026-06-19",
+        "temperature": 17.8,
+        "humidity": 84,
+        "co2": 560,
+        "dripRate": 0,
+        "disturbance": "",
+        "photos": [],
+        "status": "异常待复查",
+        "autoRiskLevel": "正常",
+        "autoRiskReasons": [],
+        "deviationTemp": 0.3,
+        "deviationHumidity": 1,
+        "deviationCo2": 10,
+        "reviewNote": "",
+        "createdAt": "2026-06-19T09:30:00.000Z",
+        "updatedAt": "2026-06-21T13:19:38.535Z",
+        "history": [
+          {
+            "at": "2026-06-21T13:19:38.535Z",
+            "action": "标记异常",
+            "note": "状态流转"
+          },
+          {
+            "at": "2026-06-21T13:12:02.728Z",
+            "action": "标记异常",
+            "note": "状态流转"
+          },
+          {
+            "at": "2026-06-19T09:30:00.000Z",
+            "action": "创建",
+            "note": "例行巡测，一切正常"
+          }
+        ],
+        "manuallyReviewed": true
+      },
+      "after": {
+        "id": "survey-seed-2",
+        "createdAt": "2026-06-19T09:30:00.000Z",
+        "updatedAt": "2026-06-21T13:26:00.404Z",
+        "history": [
+          {
+            "at": "2026-06-21T13:26:00.404Z",
+            "action": "回滚",
+            "note": "恢复到「标记异常」(2026-06-21T13:12:02.728Z) 操作完成后的状态"
+          },
+          {
+            "at": "2026-06-21T13:19:38.535Z",
+            "action": "标记异常",
+            "note": "状态流转"
+          },
+          {
+            "at": "2026-06-21T13:12:02.728Z",
+            "action": "标记异常",
+            "note": "状态流转"
+          },
+          {
+            "at": "2026-06-19T09:30:00.000Z",
+            "action": "创建",
+            "note": "例行巡测，一切正常"
+          }
+        ],
+        "siteId": "site-seed-2",
+        "surveyor": "李明",
+        "date": "2026-06-19",
+        "temperature": 17.8,
+        "humidity": 84,
+        "co2": 560,
+        "dripRate": 0,
+        "disturbance": "",
+        "photos": [],
+        "status": "异常待复查",
+        "autoRiskLevel": "正常",
+        "autoRiskReasons": [],
+        "deviationTemp": 0.3,
+        "deviationHumidity": 1,
+        "deviationCo2": 10,
+        "reviewNote": "",
+        "manuallyReviewed": true
+      },
+      "diff": {},
+      "note": "恢复到「标记异常」(2026-06-21T13:12:02.728Z) 操作完成后的状态，源审计记录：audit-1782047522728-2f5a7（标记异常）",
+      "operator": "张管理",
+      "relatedImpacts": [
+        {
+          "collection": "sites",
+          "recordId": "site-seed-2",
+          "relationLabel": "关联样点",
+          "impactType": "direct",
+          "isActualImpact": false,
+          "description": "关联样点（仅关联，未自动修改）",
+          "recordLabel": "北麓三号洞 / 入口大厅区 / A-01"
+        }
+      ],
+      "createdAt": "2026-06-21T13:26:00.404Z"
+    },
+    {
+      "id": "audit-1782047978535-e441d",
+      "collection": "sites",
+      "recordId": "site-seed-2",
+      "action": "action",
+      "actionLabel": "标记异常",
+      "before": {
+        "id": "site-seed-2",
+        "cave": "北麓三号洞",
+        "zone": "入口大厅区",
+        "pointCode": "A-01",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "重点保护",
+        "baselineTemp": 17.5,
+        "baselineHumidity": 85,
+        "baselineCo2": 550,
+        "note": "洞穴入口，温度波动较大",
+        "createdAt": "2026-06-14T08:10:00.000Z",
+        "updatedAt": "2026-06-21T13:12:02.728Z",
+        "history": [
+          {
+            "at": "2026-06-21T13:12:02.728Z",
+            "action": "标记异常",
+            "note": "状态流转"
+          },
+          {
+            "at": "2026-06-14T08:10:00.000Z",
+            "action": "创建",
+            "note": "样点建档"
+          }
+        ]
+      },
+      "after": {
+        "id": "site-seed-2",
+        "cave": "北麓三号洞",
+        "zone": "入口大厅区",
+        "pointCode": "A-01",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "重点保护",
+        "baselineTemp": 17.5,
+        "baselineHumidity": 85,
+        "baselineCo2": 550,
+        "note": "洞穴入口，温度波动较大",
+        "createdAt": "2026-06-14T08:10:00.000Z",
+        "updatedAt": "2026-06-21T13:19:38.535Z",
+        "history": [
+          {
+            "at": "2026-06-21T13:19:38.535Z",
+            "action": "标记异常",
+            "note": "状态流转"
+          },
+          {
+            "at": "2026-06-21T13:12:02.728Z",
+            "action": "标记异常",
+            "note": "状态流转"
+          },
+          {
+            "at": "2026-06-14T08:10:00.000Z",
+            "action": "创建",
+            "note": "样点建档"
+          }
+        ]
+      },
+      "diff": {},
+      "note": "测试标记异常（关联操作）",
+      "operator": "张管理",
+      "relatedImpacts": [
+        {
+          "collection": "surveys",
+          "recordId": "survey-seed-2",
+          "relationLabel": "触发操作",
+          "impactType": "cascade",
+          "description": "由标记异常操作联动修改",
+          "recordLabel": "李明 / 2026-06-19"
+        }
+      ],
+      "createdAt": "2026-06-21T13:19:38.535Z"
+    },
+    {
+      "id": "audit-1782047978535-6d946",
+      "collection": "surveys",
+      "recordId": "survey-seed-2",
+      "action": "action",
+      "actionLabel": "标记异常",
+      "before": {
+        "id": "survey-seed-2",
+        "siteId": "site-seed-2",
+        "surveyor": "李明",
+        "date": "2026-06-19",
+        "temperature": 17.8,
+        "humidity": 84,
+        "co2": 560,
+        "dripRate": 0,
+        "disturbance": "",
+        "photos": [],
+        "status": "异常待复查",
+        "autoRiskLevel": "正常",
+        "autoRiskReasons": [],
+        "deviationTemp": 0.3,
+        "deviationHumidity": 1,
+        "deviationCo2": 10,
+        "reviewNote": "",
+        "createdAt": "2026-06-19T09:30:00.000Z",
+        "updatedAt": "2026-06-21T13:12:02.728Z",
+        "history": [
+          {
+            "at": "2026-06-21T13:12:02.728Z",
+            "action": "标记异常",
+            "note": "状态流转"
+          },
+          {
+            "at": "2026-06-19T09:30:00.000Z",
+            "action": "创建",
+            "note": "例行巡测，一切正常"
+          }
+        ],
+        "manuallyReviewed": true
+      },
+      "after": {
+        "id": "survey-seed-2",
+        "siteId": "site-seed-2",
+        "surveyor": "李明",
+        "date": "2026-06-19",
+        "temperature": 17.8,
+        "humidity": 84,
+        "co2": 560,
+        "dripRate": 0,
+        "disturbance": "",
+        "photos": [],
+        "status": "异常待复查",
+        "autoRiskLevel": "正常",
+        "autoRiskReasons": [],
+        "deviationTemp": 0.3,
+        "deviationHumidity": 1,
+        "deviationCo2": 10,
+        "reviewNote": "",
+        "createdAt": "2026-06-19T09:30:00.000Z",
+        "updatedAt": "2026-06-21T13:19:38.535Z",
+        "history": [
+          {
+            "at": "2026-06-21T13:19:38.535Z",
+            "action": "标记异常",
+            "note": "状态流转"
+          },
+          {
+            "at": "2026-06-21T13:12:02.728Z",
+            "action": "标记异常",
+            "note": "状态流转"
+          },
+          {
+            "at": "2026-06-19T09:30:00.000Z",
+            "action": "创建",
+            "note": "例行巡测，一切正常"
+          }
+        ],
+        "manuallyReviewed": true
+      },
+      "diff": {},
+      "note": "测试标记异常",
+      "operator": "张管理",
+      "relatedImpacts": [
+        {
+          "collection": "sites",
+          "recordId": "site-seed-2",
+          "relationLabel": "关联样点",
+          "impactType": "direct",
+          "isActualImpact": false,
+          "description": "关联样点（仅关联，未自动修改）",
+          "recordLabel": "北麓三号洞 / 入口大厅区 / A-01"
+        },
+        {
+          "collection": "sites",
+          "recordId": "site-seed-2",
+          "relationLabel": "关联记录",
+          "impactType": "cascade",
+          "description": "同步修改了关联记录",
+          "recordLabel": "北麓三号洞 / 入口大厅区 / A-01"
+        }
+      ],
+      "createdAt": "2026-06-21T13:19:38.535Z"
+    },
+    {
+      "id": "audit-1782047522728-0d9b2",
+      "collection": "sites",
+      "recordId": "site-seed-2",
+      "action": "action",
+      "actionLabel": "标记异常",
+      "before": {
+        "id": "site-seed-2",
+        "cave": "北麓三号洞",
+        "zone": "入口大厅区",
+        "pointCode": "A-01",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "常规观察",
+        "baselineTemp": 17.5,
+        "baselineHumidity": 85,
+        "baselineCo2": 550,
+        "note": "洞穴入口，温度波动较大",
+        "createdAt": "2026-06-14T08:10:00.000Z",
+        "updatedAt": "2026-06-14T08:10:00.000Z",
+        "history": [
+          {
+            "at": "2026-06-14T08:10:00.000Z",
+            "action": "创建",
+            "note": "样点建档"
+          }
+        ]
+      },
+      "after": {
+        "id": "site-seed-2",
+        "cave": "北麓三号洞",
+        "zone": "入口大厅区",
+        "pointCode": "A-01",
+        "route": "东线巡测",
+        "sensitivity": "中",
+        "protectedStatus": "重点保护",
+        "baselineTemp": 17.5,
+        "baselineHumidity": 85,
+        "baselineCo2": 550,
+        "note": "洞穴入口，温度波动较大",
+        "createdAt": "2026-06-14T08:10:00.000Z",
+        "updatedAt": "2026-06-21T13:12:02.728Z",
+        "history": [
+          {
+            "at": "2026-06-21T13:12:02.728Z",
+            "action": "标记异常",
+            "note": "状态流转"
+          },
+          {
+            "at": "2026-06-14T08:10:00.000Z",
+            "action": "创建",
+            "note": "样点建档"
+          }
+        ]
+      },
+      "diff": {
+        "protectedStatus": {
+          "before": "常规观察",
+          "after": "重点保护"
+        }
+      },
+      "note": "测试标记异常（关联操作）",
+      "operator": "张管理",
+      "createdAt": "2026-06-21T13:12:02.728Z"
+    },
+    {
+      "id": "audit-1782047522728-2f5a7",
+      "collection": "surveys",
+      "recordId": "survey-seed-2",
+      "action": "action",
+      "actionLabel": "标记异常",
+      "before": {
+        "id": "survey-seed-2",
+        "siteId": "site-seed-2",
+        "surveyor": "李明",
+        "date": "2026-06-19",
+        "temperature": 17.8,
+        "humidity": 84,
+        "co2": 560,
+        "dripRate": 0,
+        "disturbance": "",
+        "photos": [],
+        "status": "正常",
+        "autoRiskLevel": "正常",
+        "autoRiskReasons": [],
+        "deviationTemp": 0.3,
+        "deviationHumidity": 1,
+        "deviationCo2": 10,
+        "reviewNote": "",
+        "createdAt": "2026-06-19T09:30:00.000Z",
+        "updatedAt": "2026-06-19T09:30:00.000Z",
+        "history": [
+          {
+            "at": "2026-06-19T09:30:00.000Z",
+            "action": "创建",
+            "note": "例行巡测，一切正常"
+          }
+        ]
+      },
+      "after": {
+        "id": "survey-seed-2",
+        "siteId": "site-seed-2",
+        "surveyor": "李明",
+        "date": "2026-06-19",
+        "temperature": 17.8,
+        "humidity": 84,
+        "co2": 560,
+        "dripRate": 0,
+        "disturbance": "",
+        "photos": [],
+        "status": "异常待复查",
+        "autoRiskLevel": "正常",
+        "autoRiskReasons": [],
+        "deviationTemp": 0.3,
+        "deviationHumidity": 1,
+        "deviationCo2": 10,
+        "reviewNote": "",
+        "createdAt": "2026-06-19T09:30:00.000Z",
+        "updatedAt": "2026-06-21T13:12:02.728Z",
+        "history": [
+          {
+            "at": "2026-06-21T13:12:02.728Z",
+            "action": "标记异常",
+            "note": "状态流转"
+          },
+          {
+            "at": "2026-06-19T09:30:00.000Z",
+            "action": "创建",
+            "note": "例行巡测，一切正常"
+          }
+        ],
+        "manuallyReviewed": true
+      },
+      "diff": {
+        "status": {
+          "before": "正常",
+          "after": "异常待复查"
+        },
+        "manuallyReviewed": {
+          "after": true
+        }
+      },
+      "note": "测试标记异常",
+      "operator": "张管理",
+      "createdAt": "2026-06-21T13:12:02.728Z"
+    }
+  ]
 }

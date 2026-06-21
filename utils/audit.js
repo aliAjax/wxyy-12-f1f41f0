@@ -9,6 +9,41 @@ const AUDIT_TYPES = {
   RECALC_RISK: 'recalc_risk'
 };
 
+const COLLECTION_RELATIONS = {
+  surveys: [
+    { collection: 'sites', localKey: 'siteId', label: '关联样点' }
+  ],
+  reviews: [
+    { collection: 'surveys', localKey: 'surveyId', label: '关联巡测' },
+    { collection: 'sites', localKey: 'siteId', label: '关联样点' },
+    { collection: 'incidents', localKey: 'incidentId', label: '关联事件' }
+  ],
+  incidents: [
+    { collection: 'sites', localKey: 'siteId', label: '关联样点' },
+    { collection: 'surveys', localKey: 'surveyId', label: '关联巡测' },
+    { collection: 'reviews', localKey: 'linkedReviewId', label: '联动复查' }
+  ],
+  sites: [
+    { collection: 'surveys', localKey: 'siteId', isReverse: true, label: '关联巡测记录' }
+  ],
+  plans: [
+    { collection: 'sites', localKey: 'siteIds', isArray: true, label: '关联样点' }
+  ]
+};
+
+const IMPACT_TYPES = {
+  DIRECT: 'direct',
+  CASCADE: 'cascade',
+  HINT: 'hint',
+  REVERSE: 'reverse'
+};
+
+function isActualImpact(impact) {
+  if (!impact) return false;
+  if (impact.isActualImpact === false) return false;
+  return impact.impactType !== IMPACT_TYPES.DIRECT;
+}
+
 function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
@@ -32,9 +67,94 @@ function computeDiff(before, after) {
   return changes;
 }
 
-function createAuditLog({ db, collection, recordId, action, actionLabel, before, after, note, operator }) {
+function detectRelatedImpacts(db, collection, recordId, action, before, after) {
+  const impacts = [];
+  const relations = COLLECTION_RELATIONS[collection] || [];
+  const record = after || before;
+  if (!record) return impacts;
+
+  for (const rel of relations) {
+    if (rel.isReverse) {
+      continue;
+    }
+    if (rel.isArray) {
+      const ids = record[rel.localKey] || [];
+      if (Array.isArray(ids) && ids.length > 0) {
+        impacts.push({
+          collection: rel.collection,
+          recordIds: ids,
+          relationLabel: rel.label,
+          impactType: IMPACT_TYPES.DIRECT,
+          isActualImpact: false,
+          description: `${rel.label}：共 ${ids.length} 条（仅关联，未自动修改）`
+        });
+      }
+    } else {
+      const relatedId = record[rel.localKey];
+      if (relatedId) {
+        const relatedItem = db[rel.collection]?.find((item) => item.id === relatedId);
+        impacts.push({
+          collection: rel.collection,
+          recordId: relatedId,
+          relationLabel: rel.label,
+          impactType: IMPACT_TYPES.DIRECT,
+          isActualImpact: false,
+          description: `${rel.label}（仅关联，未自动修改）`,
+          recordLabel: relatedItem ? _getRecordLabel(rel.collection, relatedItem) : relatedId
+        });
+      }
+    }
+  }
+
+  if (action === AUDIT_TYPES.DELETE) {
+    for (const rel of relations) {
+      if (!rel.isReverse) continue;
+      const relatedItems = (db[rel.collection] || []).filter((item) => {
+        if (rel.isArray) {
+          return item[rel.localKey]?.includes(recordId);
+        }
+        return item[rel.localKey] === recordId;
+      });
+      if (relatedItems.length > 0) {
+        impacts.push({
+          collection: rel.collection,
+          recordIds: relatedItems.map((item) => item.id),
+          relationLabel: rel.label,
+          impactType: IMPACT_TYPES.REVERSE,
+          description: `${rel.label}：共 ${relatedItems.length} 条记录受影响`
+        });
+      }
+    }
+  }
+
+  return impacts;
+}
+
+function _getRecordLabel(collection, item) {
+  if (!item) return '';
+  switch (collection) {
+    case 'sites':
+      return [item.cave, item.zone, item.pointCode].filter(Boolean).join(' / ');
+    case 'surveys':
+      return [item.surveyor, item.date].filter(Boolean).join(' / ');
+    case 'reviews':
+      return [item.assignee, item.dueDate].filter(Boolean).join(' / ');
+    case 'incidents':
+      return [item.eventType, item.reporter].filter(Boolean).join(' / ');
+    case 'plans':
+      return [item.route, item.plannedDate].filter(Boolean).join(' / ');
+    default:
+      return item.id || '';
+  }
+}
+
+function createAuditLog({ db, collection, recordId, action, actionLabel, before, after, note, operator, relatedImpacts }) {
   const now = new Date().toISOString();
   const diff = computeDiff(before, after);
+  const autoImpacts = detectRelatedImpacts(db, collection, recordId, action, before, after);
+  const finalImpacts = relatedImpacts && relatedImpacts.length
+    ? [...autoImpacts, ...relatedImpacts]
+    : autoImpacts;
   const log = {
     id: `audit-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
     collection,
@@ -46,6 +166,7 @@ function createAuditLog({ db, collection, recordId, action, actionLabel, before,
     diff,
     note: note || '',
     operator: operator || 'system',
+    relatedImpacts: finalImpacts,
     createdAt: now
   };
   if (!db.auditLogs) db.auditLogs = [];
@@ -62,6 +183,40 @@ function getAuditLogsForRecord(db, collection, recordId) {
 
 function getAuditLogById(db, logId) {
   return db.auditLogs?.find((log) => log.id === logId) || null;
+}
+
+function getIncomingImpacts(db, collection, recordId) {
+  if (!db.auditLogs) return [];
+  return db.auditLogs.filter((log) => {
+    if (!log.relatedImpacts || !log.relatedImpacts.length) return false;
+    return log.relatedImpacts.some((impact) => {
+      if (impact.collection !== collection) return false;
+      if (!isActualImpact(impact)) return false;
+      if (impact.recordId === recordId) return true;
+      if (impact.recordIds && Array.isArray(impact.recordIds) && impact.recordIds.includes(recordId)) return true;
+      return false;
+    });
+  }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+function enrichAuditLogWithImpactDetails(db, log) {
+  if (!log.relatedImpacts || !log.relatedImpacts.length) return log;
+  const enriched = deepClone(log);
+  for (const impact of enriched.relatedImpacts) {
+    if (impact.recordId && !impact.recordLabel) {
+      const item = db[impact.collection]?.find((item) => item.id === impact.recordId);
+      if (item) {
+        impact.recordLabel = _getRecordLabel(impact.collection, item);
+      }
+    }
+    if (impact.recordIds && Array.isArray(impact.recordIds) && !impact.recordLabels) {
+      impact.recordLabels = impact.recordIds.map((rid) => {
+        const item = db[impact.collection]?.find((item) => item.id === rid);
+        return { id: rid, label: item ? _getRecordLabel(impact.collection, item) : rid };
+      });
+    }
+  }
+  return enriched;
 }
 
 function rollbackToAuditLog(db, logId, note, operator) {
@@ -117,9 +272,16 @@ function rollbackToAuditLog(db, logId, note, operator) {
 module.exports = {
   PROTECTED_FIELDS,
   AUDIT_TYPES,
+  COLLECTION_RELATIONS,
+  IMPACT_TYPES,
+  isActualImpact,
   computeDiff,
+  detectRelatedImpacts,
+  _getRecordLabel,
   createAuditLog,
   getAuditLogsForRecord,
   getAuditLogById,
+  getIncomingImpacts,
+  enrichAuditLogWithImpactDetails,
   rollbackToAuditLog
 };

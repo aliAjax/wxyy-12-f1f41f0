@@ -38,7 +38,10 @@
     <div class="modal-backdrop" data-close-audit></div>
     <div class="modal-content wide">
       <div class="modal-header">
-        <h2 id="auditModalTitle">审计时间线</h2>
+        <div class="modal-header-left">
+          <button class="ghost" id="auditBackBtn" data-back-audit style="display:none;">← 返回</button>
+          <h2 id="auditModalTitle">审计时间线</h2>
+        </div>
         <button class="ghost" data-close-audit>关闭</button>
       </div>
       <div class="modal-body" id="auditModalBody"></div>
