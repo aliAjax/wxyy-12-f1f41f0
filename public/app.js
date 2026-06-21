@@ -3,7 +3,9 @@ const state = {
   db: {},
   activeTab: '',
   selectedDraftIds: new Set(),
-  editingDraftId: null
+  editingDraftId: null,
+  zoneOverview: null,
+  activeZoneDetail: null
 };
 
 const DRAFT_STORAGE_KEY = 'wxyy_survey_drafts_v1';
@@ -700,6 +702,165 @@ function renderCrudView(view) {
   </section>`;
 }
 
+function zoneStatusTone(zone) {
+  if (zone.abnormal > 0) return 'bad';
+  if (zone.suspended > 0) return 'warn';
+  if (zone.keyProtection > 0) return 'warn';
+  return 'ok';
+}
+
+function renderZoneLegend(view) {
+  return `<div class="zone-legend">
+    <span class="zone-legend-title">${escapeHtml(view.legendTitle || '状态说明')}：</span>
+    <span class="zone-legend-item"><span class="zone-legend-dot ok"></span>正常</span>
+    <span class="zone-legend-item"><span class="zone-legend-dot warn"></span>重点保护</span>
+    <span class="zone-legend-item"><span class="zone-legend-dot suspended"></span>暂停开放</span>
+    <span class="zone-legend-item"><span class="zone-legend-dot bad"></span>异常待复查</span>
+  </div>`;
+}
+
+function renderZoneCard(zone, caveName) {
+  const tone = zoneStatusTone(zone);
+  const detailKey = `${caveName}||${zone.name}`;
+  const isActive = state.activeZoneDetail === detailKey;
+  return `<div class="zone-card ${tone}${isActive ? ' is-open' : ''}" data-zone="${escapeHtml(caveName)}" data-zone-name="${escapeHtml(zone.name)}" tabindex="0" role="button">
+    <div class="zone-card-head">
+      <div class="zone-card-title">
+        <h3>${escapeHtml(zone.name)}</h3>
+        ${zone.route ? `<span class="zone-route">${escapeHtml(zone.route)}</span>` : ''}
+      </div>
+      <div class="zone-card-count">
+        <strong>${zone.siteCount}</strong>
+        <span>样点</span>
+      </div>
+    </div>
+    <div class="zone-status-grid">
+      <div class="zone-status ok" title="正常">
+        <span class="zone-status-num">${zone.normal}</span>
+        <span class="zone-status-label">正常</span>
+      </div>
+      <div class="zone-status warn" title="重点保护">
+        <span class="zone-status-num">${zone.keyProtection}</span>
+        <span class="zone-status-label">重点保护</span>
+      </div>
+      <div class="zone-status suspended" title="暂停开放">
+        <span class="zone-status-num">${zone.suspended}</span>
+        <span class="zone-status-label">暂停开放</span>
+      </div>
+      <div class="zone-status bad" title="异常待复查">
+        <span class="zone-status-num">${zone.abnormal}</span>
+        <span class="zone-status-label">异常待复查</span>
+      </div>
+    </div>
+    <div class="zone-card-foot">
+      <span>最近巡测：${zone.lastSurveyAt ? fmtDate(zone.lastSurveyAt) : '暂无记录'}</span>
+      <span class="zone-expand-icon">${isActive ? '收起 ▲' : '展开详情 ▼'}</span>
+    </div>
+    ${isActive ? renderZoneDetailBody(caveName, zone.name) : ''}
+  </div>`;
+}
+
+function renderZoneDetailBody(caveName, zoneName) {
+  const detail = state.zoneDetailCache?.[`${caveName}||${zoneName}`];
+  if (!detail) {
+    return `<div class="zone-detail-loading" data-zone-loading="${escapeHtml(caveName)}" data-zone-name-loading="${escapeHtml(zoneName)}">
+      <div class="loading-spinner"></div>
+      <span>正在加载分区详情…</span>
+    </div>`;
+  }
+  return `<div class="zone-detail">
+    <div class="zone-detail-section">
+      <h4>分区样点（${detail.sites.length} 个）</h4>
+      <div class="zone-detail-list">
+        ${detail.sites.length ? detail.sites.map((site) => {
+          const latest = getLatestSurveyForSite(site.id);
+          const statusTone = toneFor(site.protectedStatus);
+          return `<div class="zone-site-item">
+            <div class="zone-site-head">
+              <strong>${escapeHtml(site.pointCode)}</strong>
+              ${site.protectedStatus ? pill(site.protectedStatus, statusTone) : ''}
+            </div>
+            <div class="meta">${escapeHtml(site.route || '-')} · 敏感等级：${escapeHtml(site.sensitivity || '-')}</div>
+            ${site.note ? `<p class="zone-site-note">${escapeHtml(site.note)}</p>` : ''}
+            ${latest ? `<div class="zone-site-latest">
+              <span class="meta">最近巡测：${escapeHtml(latest.surveyor || '-')} / ${escapeHtml(latest.date || '-')}</span>
+              <span class="zone-site-latest-meta">
+                温度 ${Number(latest.temperature || 0).toFixed(1)}℃ ·
+                湿度 ${Number(latest.humidity || 0).toFixed(0)}% ·
+                CO2 ${Number(latest.co2 || 0).toFixed(0)}ppm
+              </span>
+              ${latest.status ? pill(latest.status, toneFor(latest.status)) : ''}
+            </div>` : `<div class="meta">暂无巡测记录</div>`}
+          </div>`;
+        }).join('') : '<div class="empty" style="padding:12px">暂无样点</div>'}
+      </div>
+    </div>
+    <div class="zone-detail-section">
+      <h4>最近巡测记录（最近 ${detail.recentSurveys.length} 条）</h4>
+      <div class="zone-detail-list">
+        ${detail.recentSurveys.length ? detail.recentSurveys.map((survey) => {
+          const site = state.db.sites?.find((s) => s.id === survey.siteId);
+          const siteLabel = site ? `${site.cave} / ${site.zone} / ${site.pointCode}` : survey.siteId;
+          return `<div class="zone-survey-item">
+            <div class="zone-survey-head">
+              <strong>${escapeHtml(siteLabel)}</strong>
+              ${survey.status ? pill(survey.status, toneFor(survey.status)) : ''}
+              ${survey.autoRiskLevel && survey.autoRiskLevel !== '正常' ? pill(survey.autoRiskLevel, survey.autoRiskLevel === '高风险' ? 'bad' : 'warn') : ''}
+            </div>
+            <div class="meta">${escapeHtml(survey.surveyor || '-')} · ${escapeHtml(survey.date || '-')} · 滴水 ${survey.dripRate || 0} 滴/分钟</div>
+            <div class="detail">
+              <div>温度<br><strong>${Number(survey.temperature || 0).toFixed(1)}℃</strong>${survey.deviationTemp !== undefined ? `<small>偏差 ${Number(survey.deviationTemp).toFixed(1)}℃</small>` : ''}</div>
+              <div>湿度<br><strong>${Number(survey.humidity || 0).toFixed(0)}%</strong>${survey.deviationHumidity !== undefined ? `<small>偏差 ${Number(survey.deviationHumidity).toFixed(0)}%</small>` : ''}</div>
+              <div>CO2<br><strong>${Number(survey.co2 || 0).toFixed(0)}ppm</strong>${survey.deviationCo2 !== undefined ? `<small>偏差 ${Number(survey.deviationCo2).toFixed(0)}ppm</small>` : ''}</div>
+            </div>
+            ${survey.disturbance ? `<p><strong>干扰痕迹：</strong>${escapeHtml(survey.disturbance)}</p>` : ''}
+            ${autoRiskHtml(survey)}
+          </div>`;
+        }).join('') : '<div class="empty" style="padding:12px">暂无巡测记录</div>'}
+      </div>
+    </div>
+  </div>`;
+}
+
+function getLatestSurveyForSite(siteId) {
+  const surveys = (state.db.surveys || []).filter((s) => s.siteId === siteId);
+  if (!surveys.length) return null;
+  return surveys.sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0))[0];
+}
+
+function renderZonemapView(view) {
+  const caves = state.zoneOverview?.caves || [];
+  if (!state.zoneDetailCache) state.zoneDetailCache = {};
+  return `<section class="view" id="${view.id}">
+    <div class="panel zonemap-panel">
+      <h2>${escapeHtml(view.title || '洞穴分区态势图')}</h2>
+      ${renderZoneLegend(view)}
+      <div class="caves-container">
+        ${caves.length ? caves.map((cave) => `
+          <div class="cave-block">
+            <div class="cave-block-head">
+              <h3>${escapeHtml(cave.name)}</h3>
+              <span class="cave-block-meta">共 ${cave.zones.reduce((s, z) => s + z.siteCount, 0)} 样点 · ${cave.zones.length} 分区</span>
+            </div>
+            <div class="zones-grid">
+              ${cave.zones.map((zone) => renderZoneCard(zone, cave.name)).join('')}
+            </div>
+          </div>
+        `).join('') : '<div class="empty">暂无洞穴分区数据</div>'}
+      </div>
+    </div>
+  </section>`;
+}
+
+async function loadZoneDetail(caveName, zoneName) {
+  const key = `${caveName}||${zoneName}`;
+  if (state.zoneDetailCache?.[key]) return state.zoneDetailCache[key];
+  const detail = await api(`/api/zone-detail/${encodeURIComponent(caveName)}/${encodeURIComponent(zoneName)}`);
+  if (!state.zoneDetailCache) state.zoneDetailCache = {};
+  state.zoneDetailCache[key] = detail;
+  return detail;
+}
+
 function render() {
   $('#title').textContent = state.config.title;
   document.title = state.config.title;
@@ -707,6 +868,7 @@ function render() {
   const viewsHtml = state.config.views.map((view) => {
     if (view.type === 'dashboard') return renderDashboardView(view);
     if (view.type === 'config') return renderConfigView(view);
+    if (view.type === 'zonemap') return renderZonemapView(view);
     return renderCrudView(view);
   }).join('');
   $('#main').innerHTML = viewsHtml + renderDraftsView();
@@ -714,8 +876,47 @@ function render() {
 }
 
 async function load() {
-  state.db = await api('/api/db');
+  const [db, overview] = await Promise.all([
+    api('/api/db'),
+    api('/api/zone-overview')
+  ]);
+  state.db = db;
+  state.zoneOverview = overview;
   render();
+}
+
+async function toggleZoneDetail(cardEl) {
+  const caveName = cardEl.dataset.zone;
+  const zoneName = cardEl.dataset.zoneName;
+  const key = `${caveName}||${zoneName}`;
+  const isOpen = cardEl.classList.contains('is-open');
+  if (isOpen) {
+    state.activeZoneDetail = null;
+    cardEl.classList.remove('is-open');
+    const existingDetail = cardEl.querySelector(':scope > .zone-detail, :scope > .zone-detail-loading');
+    if (existingDetail) existingDetail.remove();
+    const icon = cardEl.querySelector('.zone-expand-icon');
+    if (icon) icon.textContent = '展开详情 ▼';
+  } else {
+    state.activeZoneDetail = key;
+    cardEl.classList.add('is-open');
+    const icon = cardEl.querySelector('.zone-expand-icon');
+    if (icon) icon.textContent = '收起 ▲';
+    try {
+      await loadZoneDetail(caveName, zoneName);
+    } catch (err) {
+      toast(`加载分区详情失败：${err.message}`);
+      state.activeZoneDetail = null;
+      cardEl.classList.remove('is-open');
+      if (icon) icon.textContent = '展开详情 ▼';
+      return;
+    }
+    const loadingEl = cardEl.querySelector(':scope > .zone-detail-loading');
+    if (loadingEl) loadingEl.remove();
+    if (!cardEl.querySelector(':scope > .zone-detail')) {
+      cardEl.insertAdjacentHTML('beforeend', renderZoneDetailBody(caveName, zoneName));
+    }
+  }
 }
 
 document.addEventListener('click', async (event) => {
@@ -733,7 +934,13 @@ document.addEventListener('click', async (event) => {
   const submitSelBtn = event.target.closest('#draftSubmitSelected');
   const deleteSelBtn = event.target.closest('#draftDeleteSelected');
   const clearErrBtn = event.target.closest('#draftClearErrors');
+  const zoneCard = event.target.closest('.zone-card');
   if (tab) setTab(tab.dataset.tab);
+  if (zoneCard && !event.target.closest('.zone-detail') && !event.target.closest('.zone-detail-loading')) {
+    event.preventDefault();
+    await toggleZoneDetail(zoneCard);
+    return;
+  }
   if (action) {
     try {
       await api(`/api/action/${action.dataset.action}/${action.dataset.id}`, { method: 'POST' });
@@ -914,9 +1121,16 @@ document.addEventListener('submit', async (event) => {
 
 $('#refreshBtn').addEventListener('click', () => load().then(() => toast('已刷新')));
 
-document.addEventListener('keydown', (event) => {
+document.addEventListener('keydown', async (event) => {
   if (event.key === 'Escape') {
     closePhotoModal();
+  }
+  const zoneCard = event.target.closest('.zone-card');
+  if (zoneCard && (event.key === 'Enter' || event.key === ' ')) {
+    if (!event.target.closest('.zone-detail') && !event.target.closest('.zone-detail-loading')) {
+      event.preventDefault();
+      await toggleZoneDetail(zoneCard);
+    }
   }
 });
 

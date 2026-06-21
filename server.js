@@ -268,6 +268,88 @@ function runAction(db, action, item) {
   return { item };
 }
 
+function getLatestSurvey(surveys, siteId) {
+  const siteSurveys = surveys.filter((s) => s.siteId === siteId);
+  if (!siteSurveys.length) return null;
+  return siteSurveys.sort(sortNewest)[0];
+}
+
+app.get('/api/zone-overview', async (req, res) => {
+  const db = await readDb();
+  const sites = db.sites || [];
+  const surveys = db.surveys || [];
+  const layout = config.zoneLayout || {};
+
+  const caveMap = {};
+  for (const site of sites) {
+    const cave = site.cave || '未分类洞穴';
+    const zone = site.zone || '未分区';
+    if (!caveMap[cave]) caveMap[cave] = {};
+    if (!caveMap[cave][zone]) {
+      caveMap[cave][zone] = {
+        name: zone,
+        siteCount: 0,
+        normal: 0,
+        keyProtection: 0,
+        suspended: 0,
+        abnormal: 0,
+        route: '',
+        sites: [],
+        lastSurveyAt: null
+      };
+    }
+    const zoneData = caveMap[cave][zone];
+    zoneData.siteCount += 1;
+    zoneData.sites.push(site.id);
+    if (site.protectedStatus === '重点保护') zoneData.keyProtection += 1;
+    else if (site.protectedStatus === '暂停开放') zoneData.suspended += 1;
+    else zoneData.normal += 1;
+
+    const latest = getLatestSurvey(surveys, site.id);
+    if (latest) {
+      if (latest.status === '异常待复查') zoneData.abnormal += 1;
+      if (!zoneData.lastSurveyAt || new Date(latest.createdAt || latest.date) > new Date(zoneData.lastSurveyAt)) {
+        zoneData.lastSurveyAt = latest.createdAt || latest.date;
+      }
+    }
+  }
+
+  const caveList = Object.keys(caveMap).map((caveName) => {
+    const caveLayout = layout[caveName];
+    const zones = Object.keys(caveMap[caveName]).map((zoneName) => {
+      const zoneLayout = caveLayout?.zones?.find((z) => z.name === zoneName);
+      return {
+        ...caveMap[caveName][zoneName],
+        order: zoneLayout?.order ?? 99,
+        route: zoneLayout?.route || caveMap[caveName][zoneName].route
+      };
+    }).sort((a, b) => a.order - b.order);
+    return {
+      name: caveName,
+      order: caveLayout?.order ?? 99,
+      zones
+    };
+  }).sort((a, b) => a.order - b.order);
+
+  res.json({ caves: caveList });
+});
+
+app.get('/api/zone-detail/:cave/:zone', async (req, res) => {
+  const db = await readDb();
+  const { cave, zone } = req.params;
+  const sites = (db.sites || []).filter((s) => s.cave === cave && s.zone === zone);
+  const siteIds = sites.map((s) => s.id);
+  const allSurveys = (db.surveys || []).filter((s) => siteIds.includes(s.siteId));
+  const sortedSurveys = allSurveys.sort(sortNewest).slice(0, 20);
+
+  res.json({
+    cave,
+    zone,
+    sites,
+    recentSurveys: sortedSurveys
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`${config.title} running at http://localhost:${PORT}`);
 });

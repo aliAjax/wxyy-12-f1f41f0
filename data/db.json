@@ -40,6 +40,319 @@
           "note": "样点建档"
         }
       ]
+    },
+    {
+      "id": "site-seed-2",
+      "cave": "北麓三号洞",
+      "zone": "入口大厅区",
+      "pointCode": "A-01",
+      "route": "东线巡测",
+      "sensitivity": "中",
+      "protectedStatus": "常规观察",
+      "baselineTemp": 17.5,
+      "baselineHumidity": 85,
+      "baselineCo2": 550,
+      "note": "洞穴入口，温度波动较大",
+      "createdAt": "2026-06-14T08:10:00.000Z",
+      "updatedAt": "2026-06-14T08:10:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-14T08:10:00.000Z",
+          "action": "创建",
+          "note": "样点建档"
+        }
+      ]
+    },
+    {
+      "id": "site-seed-3",
+      "cave": "北麓三号洞",
+      "zone": "入口大厅区",
+      "pointCode": "A-02",
+      "route": "东线巡测",
+      "sensitivity": "低",
+      "protectedStatus": "常规观察",
+      "baselineTemp": 17.2,
+      "baselineHumidity": 86,
+      "baselineCo2": 540,
+      "note": "入口左侧岩壁",
+      "createdAt": "2026-06-14T08:15:00.000Z",
+      "updatedAt": "2026-06-14T08:15:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-14T08:15:00.000Z",
+          "action": "创建",
+          "note": "样点建档"
+        }
+      ]
+    },
+    {
+      "id": "site-seed-4",
+      "cave": "北麓三号洞",
+      "zone": "水晶花厅",
+      "pointCode": "C-03",
+      "route": "中线巡测",
+      "sensitivity": "高",
+      "protectedStatus": "重点保护",
+      "baselineTemp": 15.8,
+      "baselineHumidity": 95,
+      "baselineCo2": 720,
+      "note": "稀有方解石花群落，严格限制游客接触",
+      "createdAt": "2026-06-14T08:20:00.000Z",
+      "updatedAt": "2026-06-14T08:20:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-14T08:20:00.000Z",
+          "action": "创建",
+          "note": "样点建档"
+        }
+      ]
+    },
+    {
+      "id": "site-seed-5",
+      "cave": "北麓三号洞",
+      "zone": "水晶花厅",
+      "pointCode": "C-04",
+      "route": "中线巡测",
+      "sensitivity": "高",
+      "protectedStatus": "重点保护",
+      "baselineTemp": 15.9,
+      "baselineHumidity": 94,
+      "baselineCo2": 700,
+      "note": "花厅中央石笋群",
+      "createdAt": "2026-06-14T08:25:00.000Z",
+      "updatedAt": "2026-06-14T08:25:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-14T08:25:00.000Z",
+          "action": "创建",
+          "note": "样点建档"
+        }
+      ]
+    },
+    {
+      "id": "site-seed-6",
+      "cave": "北麓三号洞",
+      "zone": "深部廊道",
+      "pointCode": "E-11",
+      "route": "西线巡测",
+      "sensitivity": "高",
+      "protectedStatus": "暂停开放",
+      "baselineTemp": 14.5,
+      "baselineHumidity": 98,
+      "baselineCo2": 850,
+      "note": "廊道尽头积水区，存在坍塌风险",
+      "createdAt": "2026-06-14T08:30:00.000Z",
+      "updatedAt": "2026-06-15T10:00:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-15T10:00:00.000Z",
+          "action": "暂停开放",
+          "note": "状态流转"
+        },
+        {
+          "at": "2026-06-14T08:30:00.000Z",
+          "action": "创建",
+          "note": "样点建档"
+        }
+      ]
+    },
+    {
+      "id": "site-seed-7",
+      "cave": "北麓三号洞",
+      "zone": "深部廊道",
+      "pointCode": "E-12",
+      "route": "西线巡测",
+      "sensitivity": "中",
+      "protectedStatus": "常规观察",
+      "baselineTemp": 14.8,
+      "baselineHumidity": 96,
+      "baselineCo2": 800,
+      "note": "廊道中段钟乳石群",
+      "createdAt": "2026-06-14T08:35:00.000Z",
+      "updatedAt": "2026-06-14T08:35:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-14T08:35:00.000Z",
+          "action": "创建",
+          "note": "样点建档"
+        }
+      ]
+    },
+    {
+      "id": "site-seed-8",
+      "cave": "南麓一号洞",
+      "zone": "前厅缓冲区",
+      "pointCode": "S-A01",
+      "route": "东线巡测",
+      "sensitivity": "低",
+      "protectedStatus": "常规观察",
+      "baselineTemp": 18.0,
+      "baselineHumidity": 82,
+      "baselineCo2": 500,
+      "note": "南洞前厅过渡区",
+      "createdAt": "2026-06-14T09:00:00.000Z",
+      "updatedAt": "2026-06-14T09:00:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-14T09:00:00.000Z",
+          "action": "创建",
+          "note": "样点建档"
+        }
+      ]
+    },
+    {
+      "id": "site-seed-9",
+      "cave": "南麓一号洞",
+      "zone": "石笋森林区",
+      "pointCode": "S-B05",
+      "route": "东线巡测",
+      "sensitivity": "高",
+      "protectedStatus": "重点保护",
+      "baselineTemp": 16.0,
+      "baselineHumidity": 93,
+      "baselineCo2": 690,
+      "note": "密集石笋分布区域",
+      "createdAt": "2026-06-14T09:10:00.000Z",
+      "updatedAt": "2026-06-14T09:10:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-14T09:10:00.000Z",
+          "action": "创建",
+          "note": "样点建档"
+        }
+      ]
+    },
+    {
+      "id": "site-seed-10",
+      "cave": "南麓一号洞",
+      "zone": "石笋森林区",
+      "pointCode": "S-B06",
+      "route": "东线巡测",
+      "sensitivity": "中",
+      "protectedStatus": "常规观察",
+      "baselineTemp": 16.2,
+      "baselineHumidity": 92,
+      "baselineCo2": 680,
+      "note": "森林区边缘",
+      "createdAt": "2026-06-14T09:15:00.000Z",
+      "updatedAt": "2026-06-14T09:15:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-14T09:15:00.000Z",
+          "action": "创建",
+          "note": "样点建档"
+        }
+      ]
+    },
+    {
+      "id": "site-seed-11",
+      "cave": "南麓一号洞",
+      "zone": "地下湖边",
+      "pointCode": "S-C09",
+      "route": "中线巡测",
+      "sensitivity": "高",
+      "protectedStatus": "重点保护",
+      "baselineTemp": 15.5,
+      "baselineHumidity": 99,
+      "baselineCo2": 780,
+      "note": "地下湖西北岸，水中钙华沉积",
+      "createdAt": "2026-06-14T09:20:00.000Z",
+      "updatedAt": "2026-06-14T09:20:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-14T09:20:00.000Z",
+          "action": "创建",
+          "note": "样点建档"
+        }
+      ]
+    },
+    {
+      "id": "site-seed-12",
+      "cave": "西麓二号洞",
+      "zone": "洞口过渡带",
+      "pointCode": "W-A01",
+      "route": "西线巡测",
+      "sensitivity": "低",
+      "protectedStatus": "常规观察",
+      "baselineTemp": 17.8,
+      "baselineHumidity": 84,
+      "baselineCo2": 520,
+      "note": "西洞口过渡区域",
+      "createdAt": "2026-06-14T10:00:00.000Z",
+      "updatedAt": "2026-06-14T10:00:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-14T10:00:00.000Z",
+          "action": "创建",
+          "note": "样点建档"
+        }
+      ]
+    },
+    {
+      "id": "site-seed-13",
+      "cave": "西麓二号洞",
+      "zone": "流石坝区",
+      "pointCode": "W-B03",
+      "route": "中线巡测",
+      "sensitivity": "高",
+      "protectedStatus": "重点保护",
+      "baselineTemp": 15.7,
+      "baselineHumidity": 95,
+      "baselineCo2": 740,
+      "note": "大规模流石坝沉积构造",
+      "createdAt": "2026-06-14T10:10:00.000Z",
+      "updatedAt": "2026-06-14T10:10:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-14T10:10:00.000Z",
+          "action": "创建",
+          "note": "样点建档"
+        }
+      ]
+    },
+    {
+      "id": "site-seed-14",
+      "cave": "西麓二号洞",
+      "zone": "流石坝区",
+      "pointCode": "W-B04",
+      "route": "中线巡测",
+      "sensitivity": "中",
+      "protectedStatus": "常规观察",
+      "baselineTemp": 15.9,
+      "baselineHumidity": 94,
+      "baselineCo2": 720,
+      "note": "坝区下游钙化池",
+      "createdAt": "2026-06-14T10:15:00.000Z",
+      "updatedAt": "2026-06-14T10:15:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-14T10:15:00.000Z",
+          "action": "创建",
+          "note": "样点建档"
+        }
+      ]
+    },
+    {
+      "id": "site-seed-15",
+      "cave": "北麓三号洞",
+      "zone": "滴水帘区",
+      "pointCode": "D-08",
+      "route": "西线巡测",
+      "sensitivity": "中",
+      "protectedStatus": "常规观察",
+      "baselineTemp": 16.4,
+      "baselineHumidity": 91,
+      "baselineCo2": 670,
+      "note": "滴水帘东侧",
+      "createdAt": "2026-06-14T08:40:00.000Z",
+      "updatedAt": "2026-06-14T08:40:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-14T08:40:00.000Z",
+          "action": "创建",
+          "note": "样点建档"
+        }
+      ]
     }
   ],
   "surveys": [
@@ -131,91 +444,234 @@
       "manuallyReviewed": true
     },
     {
-      "id": "surveys-1781974373860-05b01",
-      "status": "正常",
-      "reviewNote": "",
+      "id": "survey-seed-2",
+      "siteId": "site-seed-2",
+      "surveyor": "李明",
+      "date": "2026-06-19",
+      "temperature": 17.8,
+      "humidity": 84,
+      "co2": 560,
+      "dripRate": 0,
+      "disturbance": "",
       "photos": [],
+      "status": "正常",
       "autoRiskLevel": "正常",
       "autoRiskReasons": [],
-      "deviationTemp": 1.3000000000000007,
+      "deviationTemp": 0.3,
+      "deviationHumidity": 1,
+      "deviationCo2": 10,
+      "reviewNote": "",
+      "createdAt": "2026-06-19T09:30:00.000Z",
+      "updatedAt": "2026-06-19T09:30:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-19T09:30:00.000Z",
+          "action": "创建",
+          "note": "例行巡测，一切正常"
+        }
+      ]
+    },
+    {
+      "id": "survey-seed-3",
+      "siteId": "site-seed-4",
+      "surveyor": "沈宁",
+      "date": "2026-06-19",
+      "temperature": 16.5,
+      "humidity": 93,
+      "co2": 760,
+      "dripRate": 8,
+      "disturbance": "",
+      "photos": [],
+      "status": "正常",
+      "autoRiskLevel": "预警",
+      "autoRiskReasons": [
+        "温度偏差0.7℃，CO2偏差40ppm"
+      ],
+      "deviationTemp": 0.7,
       "deviationHumidity": 2,
       "deviationCo2": 40,
-      "siteId": "site-seed-1",
-      "surveyor": "张巡测员",
-      "date": "2026-06-21",
-      "temperature": 17.5,
-      "humidity": 90,
-      "co2": 720,
+      "reviewNote": "",
+      "createdAt": "2026-06-19T10:15:00.000Z",
+      "updatedAt": "2026-06-19T10:15:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-19T10:15:00.000Z",
+          "action": "创建",
+          "note": "例行巡测"
+        }
+      ]
+    },
+    {
+      "id": "survey-seed-4",
+      "siteId": "site-seed-6",
+      "surveyor": "王芳",
+      "date": "2026-06-17",
+      "temperature": 15.2,
+      "humidity": 99,
+      "co2": 1300,
       "dripRate": 15,
-      "disturbance": "测试离线草稿功能",
-      "createdAt": "2026-06-20T16:52:53.860Z",
-      "updatedAt": "2026-06-20T16:52:53.860Z",
-      "history": [
-        {
-          "at": "2026-06-20T16:52:53.860Z",
-          "action": "创建",
-          "note": "自动判定：正常"
-        }
-      ],
-      "manuallyReviewed": false
-    },
-    {
-      "id": "surveys-1781974498980-33b3e",
-      "status": "正常",
-      "reviewNote": "",
+      "disturbance": "发现落石碎片",
       "photos": [],
-      "autoRiskLevel": "正常",
-      "autoRiskReasons": [],
-      "deviationTemp": 0.6000000000000014,
+      "status": "异常待复查",
+      "autoRiskLevel": "高风险",
+      "autoRiskReasons": [
+        "CO2偏差450ppm≥400ppm(高风险阈值)"
+      ],
+      "deviationTemp": 0.7,
       "deviationHumidity": 1,
-      "deviationCo2": 30,
-      "siteId": "site-seed-1",
-      "surveyor": "王巡测员B",
-      "date": "2026-06-19",
-      "temperature": 16.8,
-      "humidity": 93,
-      "co2": 650,
-      "dripRate": 18,
-      "disturbance": "测试草稿不丢失B",
-      "createdAt": "2026-06-20T16:54:58.980Z",
-      "updatedAt": "2026-06-20T16:54:58.980Z",
+      "deviationCo2": 450,
+      "reviewNote": "",
+      "createdAt": "2026-06-17T14:00:00.000Z",
+      "updatedAt": "2026-06-17T14:00:00.000Z",
       "history": [
         {
-          "at": "2026-06-20T16:54:58.980Z",
+          "at": "2026-06-17T14:00:00.000Z",
           "action": "创建",
-          "note": "自动判定：正常"
+          "note": "深部廊道CO2过高，发现落石"
         }
-      ],
-      "manuallyReviewed": false
+      ]
     },
     {
-      "id": "surveys-1781974498984-da5a1",
-      "status": "正常",
-      "reviewNote": "",
-      "photos": [],
-      "autoRiskLevel": "正常",
-      "autoRiskReasons": [],
-      "deviationTemp": 1.8000000000000007,
-      "deviationHumidity": 3,
-      "deviationCo2": 120,
-      "siteId": "site-seed-1",
-      "surveyor": "李巡测员A",
+      "id": "survey-seed-5",
+      "siteId": "site-seed-9",
+      "surveyor": "李明",
       "date": "2026-06-20",
-      "temperature": 18,
-      "humidity": 95,
-      "co2": 800,
-      "dripRate": 10,
-      "disturbance": "测试草稿不丢失A",
-      "createdAt": "2026-06-20T16:54:58.984Z",
-      "updatedAt": "2026-06-20T16:54:58.984Z",
+      "temperature": 20.5,
+      "humidity": 90,
+      "co2": 750,
+      "dripRate": 5,
+      "disturbance": "",
+      "photos": [],
+      "status": "异常待复查",
+      "autoRiskLevel": "高风险",
+      "autoRiskReasons": [
+        "温度偏差4.5℃≥4℃(高风险阈值)"
+      ],
+      "deviationTemp": 4.5,
+      "deviationHumidity": 3,
+      "deviationCo2": 60,
+      "reviewNote": "",
+      "createdAt": "2026-06-20T11:00:00.000Z",
+      "updatedAt": "2026-06-20T11:00:00.000Z",
       "history": [
         {
-          "at": "2026-06-20T16:54:58.984Z",
+          "at": "2026-06-20T11:00:00.000Z",
           "action": "创建",
-          "note": "自动判定：正常"
+          "note": "石笋森林区温度异常偏高"
         }
-      ],
-      "manuallyReviewed": false
+      ]
+    },
+    {
+      "id": "survey-seed-6",
+      "siteId": "site-seed-11",
+      "surveyor": "王芳",
+      "date": "2026-06-20",
+      "temperature": 15.8,
+      "humidity": 98,
+      "co2": 800,
+      "dripRate": 20,
+      "disturbance": "",
+      "photos": [],
+      "status": "正常",
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 0.3,
+      "deviationHumidity": 0,
+      "deviationCo2": 20,
+      "reviewNote": "",
+      "createdAt": "2026-06-20T13:30:00.000Z",
+      "updatedAt": "2026-06-20T13:30:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-20T13:30:00.000Z",
+          "action": "创建",
+          "note": "地下湖边正常"
+        }
+      ]
+    },
+    {
+      "id": "survey-seed-7",
+      "siteId": "site-seed-13",
+      "surveyor": "沈宁",
+      "date": "2026-06-19",
+      "temperature": 16.0,
+      "humidity": 94,
+      "co2": 760,
+      "dripRate": 18,
+      "disturbance": "",
+      "photos": [],
+      "status": "正常",
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 0.3,
+      "deviationHumidity": 1,
+      "deviationCo2": 20,
+      "reviewNote": "",
+      "createdAt": "2026-06-19T15:00:00.000Z",
+      "updatedAt": "2026-06-19T15:00:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-19T15:00:00.000Z",
+          "action": "创建",
+          "note": "流石坝区正常"
+        }
+      ]
+    },
+    {
+      "id": "survey-seed-8",
+      "siteId": "site-seed-5",
+      "surveyor": "李明",
+      "date": "2026-06-18",
+      "temperature": 15.9,
+      "humidity": 94,
+      "co2": 710,
+      "dripRate": 9,
+      "disturbance": "",
+      "photos": [],
+      "status": "正常",
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 0,
+      "deviationHumidity": 0,
+      "deviationCo2": 10,
+      "reviewNote": "",
+      "createdAt": "2026-06-18T10:45:00.000Z",
+      "updatedAt": "2026-06-18T10:45:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-18T10:45:00.000Z",
+          "action": "创建",
+          "note": "水晶花厅正常"
+        }
+      ]
+    },
+    {
+      "id": "survey-seed-9",
+      "siteId": "site-seed-15",
+      "surveyor": "王芳",
+      "date": "2026-06-20",
+      "temperature": 16.8,
+      "humidity": 90,
+      "co2": 680,
+      "dripRate": 11,
+      "disturbance": "",
+      "photos": [],
+      "status": "正常",
+      "autoRiskLevel": "正常",
+      "autoRiskReasons": [],
+      "deviationTemp": 0.4,
+      "deviationHumidity": 1,
+      "deviationCo2": 10,
+      "reviewNote": "",
+      "createdAt": "2026-06-20T09:20:00.000Z",
+      "updatedAt": "2026-06-20T09:20:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-20T09:20:00.000Z",
+          "action": "创建",
+          "note": "滴水帘东侧正常"
+        }
+      ]
     }
   ],
   "plans": [
@@ -223,7 +679,10 @@
       "id": "plan-seed-1",
       "route": "西线巡测",
       "siteIds": [
-        "site-seed-1"
+        "site-seed-1",
+        "site-seed-6",
+        "site-seed-7",
+        "site-seed-15"
       ],
       "manager": "沈宁",
       "plannedDate": "2026-06-22",
@@ -261,6 +720,30 @@
           "at": "2026-06-20T14:21:42.512Z",
           "action": "创建",
           "note": "月度重点巡查"
+        }
+      ]
+    },
+    {
+      "id": "plan-seed-2",
+      "route": "中线巡测",
+      "siteIds": [
+        "site-seed-4",
+        "site-seed-5",
+        "site-seed-11",
+        "site-seed-13",
+        "site-seed-14"
+      ],
+      "manager": "王芳",
+      "plannedDate": "2026-06-23",
+      "status": "待执行",
+      "note": "中线深区巡测",
+      "createdAt": "2026-06-20T09:00:00.000Z",
+      "updatedAt": "2026-06-20T09:00:00.000Z",
+      "history": [
+        {
+          "at": "2026-06-20T09:00:00.000Z",
+          "action": "创建",
+          "note": "中线深区巡测"
         }
       ]
     }

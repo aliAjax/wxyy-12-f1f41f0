@@ -2,6 +2,32 @@ module.exports = {
   port: 3912,
   title: '钟乳石洞穴微环境巡测',
   lede: '围绕洞穴、分区、样点和巡测路线记录微环境数据，发现异常后生成复查闭环。',
+  zoneLayout: {
+    '北麓三号洞': {
+      order: 1,
+      zones: [
+        { name: '入口大厅区', order: 1, route: '东线巡测' },
+        { name: '滴水帘区', order: 2, route: '西线巡测' },
+        { name: '水晶花厅', order: 3, route: '中线巡测' },
+        { name: '深部廊道', order: 4, route: '西线巡测' }
+      ]
+    },
+    '南麓一号洞': {
+      order: 2,
+      zones: [
+        { name: '前厅缓冲区', order: 1, route: '东线巡测' },
+        { name: '石笋森林区', order: 2, route: '东线巡测' },
+        { name: '地下湖边', order: 3, route: '中线巡测' }
+      ]
+    },
+    '西麓二号洞': {
+      order: 3,
+      zones: [
+        { name: '洞口过渡带', order: 1, route: '西线巡测' },
+        { name: '流石坝区', order: 2, route: '中线巡测' }
+      ]
+    }
+  },
   tones: {
     '常规观察': 'ok',
     '正常': 'ok',
@@ -45,6 +71,13 @@ module.exports = {
       type: 'dashboard',
       focusTitle: '异常与复查',
       focus: { collection: 'surveys', field: 'status', values: ['异常待复查'], limit: 8 }
+    },
+    {
+      id: 'zonemap',
+      label: '分区态势图',
+      type: 'zonemap',
+      title: '洞穴分区态势图',
+      legendTitle: '状态说明'
     },
     {
       id: 'config',
