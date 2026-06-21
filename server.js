@@ -301,16 +301,22 @@ app.get('/api/zone-overview', async (req, res) => {
     const zoneData = caveMap[cave][zone];
     zoneData.siteCount += 1;
     zoneData.sites.push(site.id);
-    if (site.protectedStatus === '重点保护') zoneData.keyProtection += 1;
-    else if (site.protectedStatus === '暂停开放') zoneData.suspended += 1;
-    else zoneData.normal += 1;
 
     const latest = getLatestSurvey(surveys, site.id);
     if (latest) {
-      if (latest.status === '异常待复查') zoneData.abnormal += 1;
       if (!zoneData.lastSurveyAt || new Date(latest.createdAt || latest.date) > new Date(zoneData.lastSurveyAt)) {
         zoneData.lastSurveyAt = latest.createdAt || latest.date;
       }
+    }
+
+    if (latest && latest.status === '异常待复查') {
+      zoneData.abnormal += 1;
+    } else if (site.protectedStatus === '暂停开放') {
+      zoneData.suspended += 1;
+    } else if (site.protectedStatus === '重点保护') {
+      zoneData.keyProtection += 1;
+    } else {
+      zoneData.normal += 1;
     }
   }
 
@@ -340,7 +346,7 @@ app.get('/api/zone-detail/:cave/:zone', async (req, res) => {
   const sites = (db.sites || []).filter((s) => s.cave === cave && s.zone === zone);
   const siteIds = sites.map((s) => s.id);
   const allSurveys = (db.surveys || []).filter((s) => siteIds.includes(s.siteId));
-  const sortedSurveys = allSurveys.sort(sortNewest).slice(0, 20);
+  const sortedSurveys = allSurveys.sort(sortNewest).slice(0, 10);
 
   res.json({
     cave,
