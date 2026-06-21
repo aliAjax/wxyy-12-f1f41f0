@@ -33,7 +33,7 @@ const DraftStore = {
   save(list) {
     localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(list));
   },
-  add(data) {
+  add(data, extra = {}) {
     const list = this.all();
     const now = new Date().toISOString();
     const draft = {
@@ -42,11 +42,37 @@ const DraftStore = {
       data,
       createdAt: now,
       updatedAt: now,
-      submitError: null
+      submitError: null,
+      ...extra
     };
     list.unshift(draft);
     this.save(list);
     return draft;
+  },
+  addMany(items) {
+    if (!items || !items.length) return [];
+    const list = this.all();
+    const now = new Date().toISOString();
+    const created = [];
+    for (const item of items) {
+      const draft = {
+        id: `draft-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
+        collection: 'surveys',
+        data: item.data,
+        createdAt: now,
+        updatedAt: now,
+        submitError: null,
+        ...(item.extra || {})
+      };
+      list.unshift(draft);
+      created.push(draft);
+    }
+    this.save(list);
+    return created;
+  },
+  findByPlanId(planId) {
+    if (!planId) return [];
+    return this.all().filter((d) => d.data?.planId === planId);
   },
   update(id, data) {
     const list = this.all();
@@ -148,6 +174,7 @@ function actionPermissionMap(actionId) {
     'survey-review': 'surveys:review',
     'plan-complete': 'plans:complete',
     'plan-reopen': 'plans:update',
+    'plan-generate-drafts': 'plans:generateDrafts',
     'review-complete': 'reviews:complete',
     'incident-processing': 'incidents:process',
     'incident-resolve': 'incidents:process',
@@ -675,13 +702,39 @@ function renderCard(item, collection, view) {
     return site ? [site.cave, site.zone, site.pointCode].filter(Boolean).join(' / ') : id;
   }).join('、'))}</div>` : '';
   const summary = (view.summaryFields || []).map((field) => item[field]).filter(Boolean).join(' · ');
+
+  let planDraftsBadge = '';
   const actions = state.config.actions
     .filter((action) => action.collection === collection)
     .map((action) => {
       const perm = actionPermissionMap(action.id);
-      const disabled = perm ? !hasPermission(perm) : false;
-      const title = disabled ? '无权限执行此操作' : '';
-      return `<button class="${action.danger ? 'danger' : 'ghost'}" data-action="${action.id}" data-id="${item.id}" ${disabled ? 'disabled title="无权限执行此操作"' : ''}>${escapeHtml(action.label)}</button>`;
+      const permDisabled = perm ? !hasPermission(perm) : false;
+
+      if (action.id === 'plan-generate-drafts' && collection === 'plans') {
+        const existingDrafts = DraftStore.findByPlanId(item.id);
+        const hasExistingDrafts = existingDrafts.length > 0;
+        const hasGeneratedDrafts = Boolean(item.draftsGenerated) || hasExistingDrafts;
+        const siteIds = item.siteIds || [];
+        const hasSites = siteIds.length > 0;
+        const disabled = permDisabled || !hasSites || hasGeneratedDrafts;
+        let buttonLabel = action.label;
+        let buttonClass = 'ghost plan-generate-drafts-btn';
+        let extraAttrs = '';
+
+        if (hasGeneratedDrafts) {
+          buttonLabel = hasExistingDrafts ? `草稿已生成 (${existingDrafts.length}条)` : '草稿已生成';
+          buttonClass += ' plan-drafts-exist';
+          extraAttrs = 'title="草稿已生成，禁止重复生成"';
+          planDraftsBadge = `<span class="pill plan-drafts-status-pill" title="草稿已生成，禁止重复生成">📝 ${hasExistingDrafts ? `已生成 ${existingDrafts.length} 条草稿` : '已生成草稿'}</span>`;
+        } else if (!hasSites) {
+          extraAttrs = 'title="该计划暂未关联样点，无法生成草稿"';
+        }
+
+        return `<button class="${buttonClass}" data-plan-generate-drafts="${item.id}" ${disabled ? 'disabled' : ''} ${permDisabled ? 'title="无权限执行此操作"' : extraAttrs}>${escapeHtml(buttonLabel)}</button>`;
+      }
+
+      const title = permDisabled ? '无权限执行此操作' : '';
+      return `<button class="${action.danger ? 'danger' : 'ghost'}" data-action="${action.id}" data-id="${item.id}" ${permDisabled ? 'disabled title="无权限执行此操作"' : ''}>${escapeHtml(action.label)}</button>`;
     })
     .join('');
   const canViewAudit = hasPermission('audit:view');
@@ -689,7 +742,7 @@ function renderCard(item, collection, view) {
     ? `<button class="ghost" data-audit-history="${collection}:${item.id}" data-audit-title="${escapeHtml(title)}">📋 审计历史</button>`
     : '';
   return `<article class="card">
-    <div class="card-head"><h3>${escapeHtml(title)}</h3><div class="card-head-right">${statusValue ? pill(statusValue, toneFor(statusValue)) : ''}${photosBadgeHtml(item, collection)}</div></div>
+    <div class="card-head"><h3>${escapeHtml(title)}</h3><div class="card-head-right">${statusValue ? pill(statusValue, toneFor(statusValue)) : ''}${planDraftsBadge}${photosBadgeHtml(item, collection)}</div></div>
     ${relation}
     ${siteListHtml}
     ${summary ? `<p>${escapeHtml(summary)}</p>` : ''}
@@ -778,12 +831,21 @@ function renderDraftCard(draft) {
     ? `<div class="draft-error"><strong>上次提交失败</strong><p>${escapeHtml(draft.submitError)}</p></div>`
     : '';
   const photoCount = Array.isArray(d.photos) ? d.photos.length : 0;
+  let planSourceBadge = '';
+  if (d.planId) {
+    const plan = state.db.plans?.find((p) => p.id === d.planId);
+    if (plan) {
+      const planLabel = [plan.route, plan.plannedDate].filter(Boolean).join(' · ');
+      planSourceBadge = `<span class="pill plan-source-pill" title="来自巡测计划">📋 ${escapeHtml(planLabel)}</span>`;
+    }
+  }
   return `<article class="card draft-card${selected ? ' is-selected' : ''}${draft.submitError ? ' has-error' : ''}">
     <div class="card-head">
       <label class="draft-check"><input type="checkbox" data-draft-check="${draft.id}" ${selected ? 'checked' : ''}><span></span></label>
       <h3>${escapeHtml(draftTitle(draft))}</h3>
       <div class="card-head-right">
         <span class="pill draft-pill">本地草稿</span>
+        ${planSourceBadge}
         ${photoCount > 0 ? `<span class="pill">📷 ${photoCount}张</span>` : ''}
       </div>
     </div>
@@ -909,6 +971,63 @@ async function submitDrafts(ids) {
     await load();
   }
   return { success: successIds.length, fail: failed.length, failed };
+}
+
+async function generateDraftsForPlan(planId) {
+  const plan = state.db.plans?.find((p) => p.id === planId);
+  if (!plan) {
+    toast('计划不存在');
+    return;
+  }
+  const siteIds = plan.siteIds || [];
+  if (!siteIds.length) {
+    toast('该计划未关联样点');
+    return;
+  }
+  const existingDrafts = DraftStore.findByPlanId(planId);
+  if (plan.draftsGenerated || existingDrafts.length > 0) {
+    toast(plan.draftsGenerated ? '该计划已生成过巡测草稿，禁止重复生成' : `该计划已生成 ${existingDrafts.length} 条草稿，禁止重复生成`);
+    return;
+  }
+  const draftItems = [];
+  const surveysView = state.config.views.find((v) => v.id === 'surveys');
+  const defaults = surveysView?.defaults || {};
+  for (const siteId of siteIds) {
+    const site = state.db.sites?.find((s) => s.id === siteId);
+    if (!site) continue;
+    const data = {
+      ...defaults,
+      planId: plan.id,
+      siteId: site.id,
+      surveyor: plan.manager || '',
+      date: plan.plannedDate || new Date().toISOString().slice(0, 10),
+      temperature: site.baselineTemp ?? '',
+      humidity: site.baselineHumidity ?? '',
+      co2: site.baselineCo2 ?? '',
+      dripRate: 0,
+      disturbance: '',
+      photos: [],
+      note: plan.note ? `巡测计划：${plan.route}（${plan.plannedDate}）` : ''
+    };
+    draftItems.push({
+      data,
+      extra: { planId: plan.id }
+    });
+  }
+  if (!draftItems.length) {
+    toast('没有可生成草稿的样点');
+    return;
+  }
+  await api(`/api/action/plan-generate-drafts/${plan.id}`, { method: 'POST' });
+  plan.draftsGenerated = true;
+  const created = DraftStore.addMany(draftItems);
+  state.selectedDraftIds.clear();
+  render();
+  updateDraftBadge();
+  toast(`已生成 ${created.length} 条巡测草稿，已保存到草稿箱`);
+  setTimeout(() => {
+    setTab('drafts');
+  }, 300);
 }
 
 function renderDashboardView(view) {
@@ -1480,6 +1599,7 @@ function clearImport() {
 document.addEventListener('click', async (event) => {
   const tab = event.target.closest('.tab');
   const action = event.target.closest('[data-action]');
+  const planGenerateDraftsBtn = event.target.closest('[data-plan-generate-drafts]');
   const addPhotoBtn = event.target.closest('.add-photo-btn');
   const removePhotoBtn = event.target.closest('.remove-photo-btn');
   const viewPhotosBtn = event.target.closest('[data-view-photos]');
@@ -1505,6 +1625,11 @@ document.addEventListener('click', async (event) => {
   if (zoneCard && !event.target.closest('.zone-detail') && !event.target.closest('.zone-detail-loading')) {
     event.preventDefault();
     await toggleZoneDetail(zoneCard);
+    return;
+  }
+  if (planGenerateDraftsBtn) {
+    const planId = planGenerateDraftsBtn.dataset.planGenerateDrafts;
+    await generateDraftsForPlan(planId);
     return;
   }
   if (action) {

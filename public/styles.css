@@ -2210,3 +2210,49 @@ button[disabled] {
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+.plan-generate-drafts-btn {
+  background: linear-gradient(135deg, rgba(17, 97, 92, 0.08), rgba(122, 90, 27, 0.12));
+  color: var(--accent);
+  border: 1px solid rgba(17, 97, 92, 0.4);
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.plan-generate-drafts-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(17, 97, 92, 0.15), rgba(122, 90, 27, 0.2));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(17, 97, 92, 0.12);
+}
+
+.plan-generate-drafts-btn.plan-drafts-exist {
+  background: linear-gradient(135deg, rgba(38, 115, 77, 0.12), rgba(38, 115, 77, 0.08));
+  border-color: rgba(38, 115, 77, 0.45);
+  color: var(--ok);
+  cursor: default;
+}
+
+.plan-generate-drafts-btn.plan-drafts-exist:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  background: linear-gradient(135deg, rgba(38, 115, 77, 0.16), rgba(38, 115, 77, 0.1));
+}
+
+.plan-drafts-status-pill {
+  background: linear-gradient(135deg, rgba(38, 115, 77, 0.18), rgba(17, 97, 92, 0.12));
+  color: var(--ok);
+  border: 1px solid rgba(38, 115, 77, 0.4);
+  font-weight: 700;
+}
+
+.plan-source-pill {
+  background: linear-gradient(135deg, rgba(17, 97, 92, 0.1), rgba(122, 90, 27, 0.12));
+  color: var(--accent);
+  border: 1px dashed rgba(17, 97, 92, 0.45);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.draft-card.has-plan-source::before {
+  content: '计划生成';
+}

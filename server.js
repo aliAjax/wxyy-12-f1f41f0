@@ -372,6 +372,7 @@ app.post('/api/action/:actionId/:id', authMiddleware, async (req, res) => {
     'survey-review': 'surveys:review',
     'plan-complete': 'plans:complete',
     'plan-reopen': 'plans:update',
+    'plan-generate-drafts': 'plans:generateDrafts',
     'review-complete': 'reviews:complete',
     'incident-processing': 'incidents:process',
     'incident-resolve': 'incidents:process',

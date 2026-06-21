@@ -19,6 +19,7 @@ module.exports = {
         'plans:update',
         'plans:delete',
         'plans:complete',
+        'plans:generateDrafts',
         'reviews:create',
         'reviews:update',
         'reviews:delete',
@@ -41,6 +42,7 @@ module.exports = {
         'surveys:update',
         'surveys:markAbnormal',
         'plans:view',
+        'plans:generateDrafts',
         'incidents:create',
         'import:surveys',
         'audit:view'
@@ -351,6 +353,7 @@ module.exports = {
     { id: 'survey-review', label: '完成复查', collection: 'surveys', patches: [{ field: 'status', value: '已复查' }, { field: 'reviewNote', value: '异常已复核' }] },
     { id: 'plan-complete', label: '标记完成', collection: 'plans', patches: [{ field: 'status', value: '已完成' }] },
     { id: 'plan-reopen', label: '重新打开', collection: 'plans', patches: [{ field: 'status', value: '待执行' }] },
+    { id: 'plan-generate-drafts', label: '生成巡测草稿', collection: 'plans', note: '巡测草稿已生成', patches: [{ field: 'draftsGenerated', value: true }] },
     {
       id: 'review-complete',
       label: '完成复查',
